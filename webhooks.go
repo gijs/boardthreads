@@ -196,7 +196,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// save it on the database
-	err = db.SaveEmail(
+	err = db.SaveEmailReceived(
 		card.ShortLink,
 		message.Id,
 		helpers.Extractsubject(message.Subject),
@@ -220,6 +220,108 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	   find related email thread
 	   send email
 	*/
+
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+	w.WriteHeader(200)
+
+	var wh struct {
+		Action goTrello.Action `json:"action"`
+	}
+	err = json.NewDecoder(r.Body).Decode(wh)
+	if err != nil {
+		reportError(raygun, err)
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	// filter out bot actions
+	if wh.Action.MemberCreator.Id == settings.TrelloBotId {
+		return
+	}
+
+	switch wh.Action.Type {
+	case "deleteCard":
+	// doesn't work because we are storing shortlinks only
+	// db.RemoveCard(wh.Action.Data.Card.Id)
+	case "updateComment":
+		text := wh.Action.Data.Action.Text
+		stripped := helpers.CommentStripPrefix(text)
+		if len(text) == len(stripped) {
+			// comment doesn't have prefix
+			return
+		}
+		// see if we have already sent this message
+		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
+		if err != nil {
+			reportError(raygun, err)
+		} else if email == nil {
+			// we couldn't find it, so let's send
+			goto sendMail
+		}
+	case "commentCard":
+		text := wh.Action.Data.Action.Text
+		stripped := helpers.CommentStripPrefix(text)
+		if len(text) == len(stripped) {
+			// comment doesn't have prefix
+			return
+		}
+		goto sendMail
+	sendMail:
+		params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
+		if err != nil {
+			reportError(raygun, err)
+			http.Error(w, err.Error(), 503)
+			return
+		}
+
+		// check outbound email address validity
+		sendingAddr := params.OutboundAddr
+		if params.OutboundAddr == "" {
+			sendingAddr = params.InboundAddr
+		} else {
+			domain := strings.Split(params.OutboundAddr, "@")[0]
+			if domain != settings.BaseDomain {
+				if !mailgun.DomainCanSend(domain) {
+					sendingAddr = params.InboundAddr
+				}
+			}
+		}
+
+		// actually send
+		messageId, err := mailgun.Send(mailgun.NewMessage{
+			HTML:          helpers.Markdown(stripped),
+			Text:          stripped,
+			Recipients:    params.Recipients,
+			From:          sendingAddr,
+			Subject:       helpers.ExtractSubject(params.LastMail.Subject),
+			InReplyTo:     params.LastMail.Id,
+			ReplyTo:       params.InboundAddr,
+			CardShortLink: wh.Action.Data.Card.ShortLink,
+			CommenterId:   wh.Action.MemberCreator.Id,
+		})
+		if err != nil {
+			reportError(raygun, err)
+			http.Error(w, err.Error(), 503)
+			return
+		}
+
+		// save email sent
+		commentId := wh.Action.Data.Action.Id
+		if commentId == "" {
+			commentId := wh.Action.Id
+		}
+		err = db.SaveCommentSent(
+			wh.Action.Data.Card.ShortLink,
+			wh.Action.MemberCreator.Id,
+			messageId,
+			commentId,
+		)
+		if err != nil {
+			reportError(raygun, err)
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}
 }
 
 func SegmentTracking(w http.ResponseWriter, r *http.Request) {}

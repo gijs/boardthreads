@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -99,12 +98,4 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteAddress(w http.ResponseWriter, r *http.Request) {
-}
-
-func reportError(raygun *raygun4go.Client, err error) {
-	if raygun == nil {
-		log.Print(err.Error())
-	} else {
-		raygun.CreateError(err.Error())
-	}
 }

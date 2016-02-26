@@ -60,11 +60,7 @@ RETURN l.id AS listId
 	return
 }
 
-func GetCardForMessage(
-	messageId string,
-	messageSubject string,
-	currentAddress string,
-) (string, error) {
+func GetCardForMessage(messageId, messageSubject, currentAddress string) (string, error) {
 	var queryResult struct {
 		ShortLink   string         `db:"cardShortLink"`
 		Address     string         `db:"address"`
@@ -101,7 +97,7 @@ LIMIT 1
 	return queryResult.ShortLink, nil
 }
 
-func SaveCardWithEmail(emailAddress string, cardShortLink string, webhookId string) (err error) {
+func SaveCardWithEmail(emailAddress, cardShortLink, webhookId string) (err error) {
 	_, err = DB.Exec(`
 MERGE (addr:EmailAddress {address: {0}})
 MERGE (c:Card {shortLink: {1}})
@@ -113,17 +109,49 @@ SET c.webhookId = {2}
 	return
 }
 
-func RemoveCard(id string) (err error) {
+func RemoveCard(shortLink string) (err error) {
 	_, err = DB.Exec(`
 MATCH (c:Card {shortLink: {0}})
 MATCH (c)-[r]-(m:Mail)
 MATCH (c)-[l]-(:EmailAddress)
 DELETE c, r, l, m
-    `, id)
+    `, shortLink)
 	return
 }
 
-func SaveEmail(cardShortLink string, messageId string, subject string, from string) (err error) {
+func GetEmailFromCommentId(commentId string) (email *Email, err error) {
+	err = DB.Get(email, `MATCH (m:Mail {commentId: {0}}) RETURN m`, commentId)
+	return
+}
+
+func GetEmailParamsForCard(shortLink string) (params *struct {
+	LastMail     Email    `db:"lastMail"`
+	InboundAddr  string   `db:"inbound"`
+	OutboundAddr string   `db:"outbound"`
+	Recipients   []string `db:"recipients"`
+}, err error) {
+	err = DB.Get(params, `
+MATCH (c:Card {shortLink: {0}})--(addr:EmailAddress)
+MATCH (outbound:EmailAddress)-[:SENDS_THROUGH]-(addr)
+MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
+
+WITH
+ c,
+ outbound,
+ addr,
+ reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
+ collect(DISTINCT m.from) AS recipients
+        
+RETURN
+ lastMail,
+ addr.address AS inbound,
+ outbound.address AS outbound,
+ recipients
+LIMIT 1`, shortLink)
+	return
+}
+
+func SaveEmailReceived(cardShortLink, messageId, subject, from string) (err error) {
 	_, err = DB.Exec(`
 MERGE (c:Card {shortLink: {0}})
 MERGE (m:Mail {
@@ -134,5 +162,23 @@ MERGE (m:Mail {
 })
 MERGE (c)-[:CONTAINS]->(m)
 `, cardShortLink, messageId, subject, from)
+	return
+}
+
+func SaveCommentSent(cardShortLink, commenterId, messageId, commentId string) (err error) {
+	_, err = DB.Exec(`
+MATCH (card:Card {shortLink: {0}})
+MATCH (card)-[:LINKED_TO]->(:EmailAddress)-[:TARGETS]->(:List)--(b:Board)
+MERGE (commenter:User {id: {1}})
+MERGE (m:Mail {id: {2}})
+  ON CREATE SET m.date = TIMESTAMP()
+
+WITH m, commenter, card, b
+SET m.commentId = {3}
+
+MERGE (b)-[:MEMBER]->(commenter)
+MERGE (card)-[:CONTAINS]->(m)
+MERGE (commenter)-[:COMMENTED]->(m)
+    `, cardShortLink, commenterId, messageId, commentId)
 	return
 }

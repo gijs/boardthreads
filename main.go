@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MindscapeHQ/raygun4go"
 	"github.com/auth0/go-jwt-middleware"
 	"github.com/carbocation/interpose"
 	"github.com/carbocation/interpose/adaptors"
@@ -19,8 +20,10 @@ import (
 type Settings struct {
 	Port           string `envconfig:"PORT"`
 	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
+	BaseDomain     string `envconfig:"BASE_DOMAIN"`
 	SessionSecret  string `envconfig:"SESSION_SECRET"`
 	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
+	TrelloBotId    string `envconfig:"TRELLO_BOT_ID"`
 }
 
 var settings Settings
@@ -79,4 +82,12 @@ func main() {
 
 	<-stop
 	log.Print("Exiting...")
+}
+
+func reportError(raygun *raygun4go.Client, err error) {
+	if raygun == nil {
+		log.Print(err.Error())
+	} else {
+		raygun.CreateError(err.Error())
+	}
 }

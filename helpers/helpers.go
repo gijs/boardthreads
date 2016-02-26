@@ -62,3 +62,10 @@ func ReplyToOrFrom(message mailgun.StoredMessage) string {
 	}
 	return message.From
 }
+
+func CommentStripPrefix(text string) string {
+	text = strings.TrimPrefix(text, ":email: ")
+	text = strings.TrimPrefix(text, ":e-mail: ")
+	text = strings.TrimPrefix(text, ":envelope: ")
+	return text
+}

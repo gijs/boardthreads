@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+
+var toMarkdown = require('to-pure-markdown')
+var getStdin = require('get-stdin')
+var sanitize = require('sanitize-html')
+var striptags = require('strip-tags')
+var he = require('he')
+  
+getStdin().then(function (html) {
+  let remove = ['link', 'script', 'style']
+  let allowed = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+    'p', 'a', 'ul', 'ol', 'quote', 'q', 'img',
+    'form', 'textarea', 'input', 'select', 'option', 'button',
+    'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr',
+    'caption', 'pre']
+
+  let stripped = striptags(html, remove)
+  let md = toMarkdown(stripped, {allowedTags: allowed})
+  let decoded = he.decode(md)
+  let sanitized = sanitize(decoded)
+
+  process.stdout.write(sanitized)
+})

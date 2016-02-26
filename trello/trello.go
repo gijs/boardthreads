@@ -1,9 +1,14 @@
 package trello
 
 import (
+	"bt/helpers"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/url"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/mailgun/mailgun-go"
 	"github.com/websitesfortrello/go-trello"
 )
 
@@ -44,14 +49,64 @@ func UserFromToken(token string) (member *trello.Member, err error) {
 	return
 }
 
-// func reviveCard(card *Card) error {
-// 	_, err = card.SendToBoard()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	_, err = card.MoveToPos("top")
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+func ReviveCard(card *trello.Card) (err error) {
+	_, err = card.SendToBoard()
+	if err != nil {
+		return
+	}
+	// _, err = card.MoveToPos("top")
+	// if err != nil {
+	// 	return
+	// }
+	return nil
+}
+
+func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *trello.Card, err error) {
+	list, err := Client.List(listId)
+	if err != nil {
+		return nil, err
+	}
+
+	card, err = list.AddCard(trello.Card{
+		IdList: listId,
+		Name:   fmt.Sprintf("%s :: %s", message.From, helpers.ExtractSubject(message.Subject)),
+		Desc: fmt.Sprintf(`
+---
+
+to: %s
+from: %s
+sender: %s
+reply-to: %s
+subject: %s
+
+---
+            `,
+			message.Recipients,
+			message.From,
+			message.Sender,
+			helpers.ReplyToOrFrom(message),
+			message.Subject,
+		),
+		Pos:       0,
+		IdMembers: []string{settings.BotId},
+	})
+
+	return
+}
+
+func CreateWebhook(entityId string, endpoint string) (string, error) {
+	params := url.Values{}
+	params.Add("idModel", entityId)
+	params.Add("callbackURL", endpoint)
+
+	body, err := Client.Put("/1/webhooks", params)
+
+	var data struct {
+		Id string `json:"id"`
+	}
+	if err = json.Unmarshal(body, data); err != nil {
+		return "", nil
+	}
+
+	return data.Id, nil
+}

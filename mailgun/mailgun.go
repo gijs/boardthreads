@@ -1,4 +1,4 @@
-package email
+package mailgun
 
 import (
 	"log"
@@ -12,7 +12,7 @@ type Settings struct {
 	Domain string `envconfig:"BASE_DOMAIN"`
 }
 
-var Client *mailgun.Mailgun
+var Client mailgun.Mailgun
 
 func init() {
 	var err error

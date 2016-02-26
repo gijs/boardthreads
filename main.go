@@ -17,9 +17,10 @@ import (
 )
 
 type Settings struct {
-	Port          string `envconfig:"PORT"`
-	SessionSecret string `envconfig:"SESSION_SECRET"`
-	RaygunAPIKey  string `envconfig:"RAYGUN_API_KEY"`
+	Port           string `envconfig:"PORT"`
+	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
+	SessionSecret  string `envconfig:"SESSION_SECRET"`
+	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
 }
 
 var settings Settings

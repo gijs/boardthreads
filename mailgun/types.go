@@ -1,6 +1,7 @@
 package mailgun
 
 type NewMessage struct {
+	ApplyMetadata bool
 	HTML          string
 	Text          string
 	Recipients    []string

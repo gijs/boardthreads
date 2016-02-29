@@ -35,8 +35,24 @@ func EnsureUser(id string) error {
 	return nil
 }
 
-func GetAddressesForUserId(userId string) (addresses []Address, err error) {
-	addresses = []Address{}
+func GetAddress(userId, emailAddress string) (address Address, err error) {
+	err = DB.Get(&address, `
+MATCH (out)<-[s:SENDS_THROUGH]-(addr:EmailAddress {address: {0}})<-[c:CONTROLS]-()
+MATCH (addr)-[t:TARGETS]->(l:List)
+OPTIONAL MATCH (out)<-[:OWNS]-(d:Domain)<-[:OWNS]-(:User {id: {1}})
+RETURN
+ l.id AS listId,
+ addr.date AS start,
+ addr.address AS inboundaddr,
+ CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
+ d.host AS domain,
+ CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
+LIMIT 1
+`, emailAddress, userId)
+	return
+}
+
+func GetAddresses(userId string) (addresses []Address, err error) {
 	err = DB.Select(&addresses, `
 MATCH (u:User {id: {0}})
 MATCH (u)-[c:CONTROLS]->(addr:EmailAddress)-->(l:List)
@@ -52,8 +68,61 @@ ORDER BY start
 	return
 }
 
+func (address *Address) Delete() (err error) {
+	_, err = DB.Exec(`
+MATCH (l:List)<-[t:TARGETS]-(addr {address: {0}})<-[c:CONTROLS]-()
+OPTIONAL MATCH ()<-[s:SENDS_THROUGH]-(addr)
+OPTIONAL MATCH (addr)-[h]-(card:Card)
+OPTIONAL MATCH (m:Mail)-[mr]-(card)
+OPTIONAL MATCH ()-[cmm:COMMENTED]->(m)
+DELETE s, t, addr, c, h, card, m, mr, cmm
+    `, address.InboundAddr)
+	return
+}
+
+func SetupNewAddress(userId, boardShortLink, listId, address string) (ok bool, err error) {
+	err = DB.Get(&ok, `
+OPTIONAL MATCH (oldaddress:EmailAddress {address: {3}})
+OPTIONAL MATCH (oldaddress)-[t:TARGETS]->()
+OPTIONAL MATCH (oldaddress)-[s:SENDS_THROUGH]->(oldsendingaddress)
+OPTIONAL MATCH (olduser:User)-[c:CONTROLS]->(oldaddress)
+MERGE (newuser:User {id: {0}})
+MERGE (newaddr:EmailAddress {address: {3}})
+  ON CREATE SET newaddr.date = TIMESTAMP()
+MERGE (newlist:List {id: {2}})
+MERGE (board:Board {shortLink: {1}})
+
+MERGE (board)-[:CONTAINS]->(newlist)
+MERGE (board)-[:MEMBER {admin: true}]->(newuser)
+
+WITH olduser, oldaddress, oldsendingaddress, t, s, c, newuser, newlist, newaddr
+
+// if 
+FOREACH (t IN CASE WHEN oldaddress IS NULL THEN [1] ELSE [] END |
+  MERGE (newuser)-[:CONTROLS]->(newaddr)
+  MERGE (newaddr)-[:TARGETS]->(newlist)
+  MERGE (newaddr)-[:SENDS_THROUGH]->(newaddr) // send through itself initially
+)
+// else
+FOREACH (oldaddress IN CASE WHEN oldaddress IS NULL THEN [] ELSE [1] END |
+  // if olduser.id == newuser.id
+  FOREACH (oldaddress IN CASE WHEN olduser.id = newuser.id THEN [1] ELSE [] END |
+    DELETE t, s, c
+    MERGE (newuser)-[:CONTROLS]->(newaddr)
+    MERGE (newaddr)-[:TARGETS]->(newlist)
+    MERGE (newaddr)-[:SENDS_THROUGH]->(oldsendingaddress) // preserve any previous sending configuration
+  )
+  // else do nothing
+)
+
+WITH CASE WHEN oldaddress IS NULL THEN true WHEN olduser.id = newuser.id THEN true ELSE false END as ok
+RETURN ok
+`, userId, boardShortLink, listId, address)
+	return
+}
+
 func GetTargetListForEmailAddress(address string) (listId string, err error) {
-	err = DB.Get(listId, `
+	err = DB.Get(&listId, `
 MATCH (:EmailAddress {address: {0}})-[:TARGETS]->(l:List)
 RETURN l.id AS listId
     `, address)
@@ -67,8 +136,8 @@ func GetCardForMessage(messageId, messageSubject, currentAddress string) (string
 		LastMessage types.NullTime `db:"last"`
 		Expired     bool           `db:"expired"`
 	}
-	err := DB.Get(`
-MATCH (m:Mail) WHERE m.id = {0} OR ((m.subject = {1} OR m.subject = {2}) AND m.from = {3})
+	err := DB.Get(&queryResult, `
+MATCH (m:Mail) WHERE m.id = {0} OR ((m.subject = {0} OR m.subject = {1}) AND m.from = {2})
 MATCH (m)--(c:Card)--(addr:EmailAddress)
 
 WITH addr, c, MAX(m.date) AS last
@@ -119,18 +188,18 @@ DELETE c, r, l, m
 	return
 }
 
-func GetEmailFromCommentId(commentId string) (email *Email, err error) {
-	err = DB.Get(email, `MATCH (m:Mail {commentId: {0}}) RETURN m`, commentId)
+func GetEmailFromCommentId(commentId string) (email Email, err error) {
+	err = DB.Get(&email, `MATCH (m:Mail {commentId: {0}}) RETURN m`, commentId)
 	return
 }
 
-func GetEmailParamsForCard(shortLink string) (params *struct {
+func GetEmailParamsForCard(shortLink string) (params struct {
 	LastMail     Email    `db:"lastMail"`
 	InboundAddr  string   `db:"inbound"`
 	OutboundAddr string   `db:"outbound"`
 	Recipients   []string `db:"recipients"`
 }, err error) {
-	err = DB.Get(params, `
+	err = DB.Get(&params, `
 MATCH (c:Card {shortLink: {0}})--(addr:EmailAddress)
 MATCH (outbound:EmailAddress)-[:SENDS_THROUGH]-(addr)
 MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
@@ -151,17 +220,18 @@ LIMIT 1`, shortLink)
 	return
 }
 
-func SaveEmailReceived(cardShortLink, messageId, subject, from string) (err error) {
+func SaveEmailReceived(cardShortLink, messageId, subject, from, commentId string) (err error) {
 	_, err = DB.Exec(`
 MERGE (c:Card {shortLink: {0}})
 MERGE (m:Mail {
   id: {1},
   subject: {2},
   from: {3},
+  commentId: {4},
   date: TIMESTAMP()
 })
 MERGE (c)-[:CONTAINS]->(m)
-`, cardShortLink, messageId, subject, from)
+`, cardShortLink, messageId, subject, from, commentId)
 	return
 }
 

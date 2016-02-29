@@ -8,8 +8,8 @@ import (
 	"net/url"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/mailgun/mailgun-go"
 	"github.com/websitesfortrello/go-trello"
+	"github.com/websitesfortrello/mailgun-go"
 )
 
 var Client *trello.Client

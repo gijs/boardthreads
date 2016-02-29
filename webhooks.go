@@ -7,7 +7,8 @@ import (
 	"bt/trello"
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/MindscapeHQ/raygun4go"
+	gfm "github.com/shurcooL/github_flavored_markdown"
 
 	goTrello "github.com/websitesfortrello/go-trello"
 )
@@ -38,30 +40,24 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	*/
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
-	var data struct {
-		Recipient string `json:"recipient"`
-		Id        string `json:"id"`
-	}
-	err = json.NewDecoder(r.Body).Decode(data)
-	if err != nil {
-		reportError(raygun, err)
-		http.Error(w, err.Error(), 400)
-		return
-	}
+	r.ParseForm()
+	recipient := r.PostFormValue("recipient")
+	url := r.PostFormValue("message-url")
 
 	// target list for this email
-	listId, err := db.GetTargetListForEmailAddress(data.Recipient)
+	listId, err := db.GetTargetListForEmailAddress(recipient)
 	if err != nil {
 		reportError(raygun, err)
-		http.Error(w, err.Error(), 406)
+		sendJSONError(w, err, 406)
 		return
 	}
 
 	// fetch entire email message
-	message, err := mailgun.Client.GetStoredMessage(data.Id)
+	urlp := strings.Split(url, "/")
+	message, err := mailgun.Client.GetStoredMessage(urlp[len(urlp)-1])
 	if err != nil {
 		reportError(raygun, err)
-		http.Error(w, err.Error(), 503)
+		sendJSONError(w, err, 503)
 		return
 	}
 
@@ -71,29 +67,32 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		card, err := trello.CreateCardFromMessage(listId, message)
 		if err != nil {
 			reportError(raygun, err)
-			http.Error(w, err.Error(), 503)
+			sendJSONError(w, err, 503)
 			return nil
 		}
 		webhookId, err := trello.CreateWebhook(card.Id, settings.WebhookHandler)
 		if err != nil {
 			reportError(raygun, err)
-			http.Error(w, err.Error(), 503)
+			sendJSONError(w, err, 503)
 			return nil
 		}
-		err = db.SaveCardWithEmail(data.Recipient, card.ShortLink, webhookId)
+		err = db.SaveCardWithEmail(recipient, card.ShortLink, webhookId)
 		if err != nil {
 			reportError(raygun, err)
-			http.Error(w, err.Error(), 500)
+			sendJSONError(w, err, 500)
 			return nil
 		}
 		return card
 	}
 
 	// get card for this mail message, if exists (and is valid)
-	shortLink, err := db.GetCardForMessage(data.Id, message.Subject, data.Recipient)
-	if err != nil {
+	shortLink, err := db.GetCardForMessage(
+		helpers.MessageHeader(message, "Message-Id"), message.Subject, recipient)
+
+	// "no rows" is an error. but that's actually a valid result for us
+	if err != nil && !strings.HasPrefix(err.Error(), "sql: no rows in result set") {
 		reportError(raygun, err)
-		http.Error(w, err.Error(), 404)
+		sendJSONError(w, err, 404)
 		return
 	}
 
@@ -108,7 +107,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 			if err != nil {
 				reportError(raygun, err)
-				http.Error(w, err.Error(), 409)
+				sendJSONError(w, err, 409)
 				return
 			}
 
@@ -119,7 +118,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			err = trello.ReviveCard(card)
 			if err != nil {
 				reportError(raygun, err)
-				http.Error(w, err.Error(), 503)
+				sendJSONError(w, err, 503)
 				return
 			}
 		}
@@ -128,21 +127,28 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		card = createCard()
 	}
 
+	// if something fails during the card creation process `card` will be nil
+	if card == nil {
+		return
+	}
+
 	// now upload attachments
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
-	attachmentUrls = make(map[string]string)
+	attachmentUrls := make(map[string]string)
 
 	for _, mailAttachment := range message.Attachments {
 		if mailAttachment.Size < 100000000 {
 			filedst := filepath.Join(dir, mailAttachment.Name)
-			err = helpers.DownloadFile(filedst, mailAttachment.Url)
+			err = helpers.DownloadFile(filedst, mailAttachment.Url, "api", settings.MailgunAPIKey)
 			if err != nil {
+				log.Print("download of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
 			trelloAttachment, err := card.UploadAttachment(filedst)
 			if err != nil {
+				log.Print("upload of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
@@ -152,16 +158,32 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// upload the message as an attachment
 	for {
+		if message.BodyHtml == "" {
+			// message body html is empty, no need to upload
+			break
+		}
+
+		// replace content-id mapped images
+		bodyHtml := message.BodyHtml
+		for cid, meta := range message.ContentIDMap {
+			cid = strings.Trim(cid, "<>")
+			oldUrl := meta.Url
+			var newUrl string
+			var ok bool
+			if newUrl, ok = attachmentUrls[oldUrl]; !ok {
+				// something is wrong here, continue
+				log.Print("didn't found the newUrl for a cid attachment.")
+				continue
+			}
+			bodyHtml = strings.Replace(bodyHtml, "cid:"+cid, newUrl, -1)
+		}
+
+		// save body-html as a temporary file then upload it
 		msgdst := filepath.Join(
 			dir,
 			time.Now().Format("2006-01-02T15:04:05Z-0700MST")+message.Sender+".html",
 		)
-		out, err := os.Open(msgdst)
-		if err != nil {
-			reportError(raygun, err)
-			break
-		}
-		_, err = io.Copy(out, message.BodyHtml)
+		err = ioutil.WriteFile(msgdst, []byte(bodyHtml), 0644)
 		if err != nil {
 			reportError(raygun, err)
 			break
@@ -185,7 +207,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
-	err = card.AddComment(
+	comment, err := card.AddComment(
 		fmt.Sprintf(":envelope_with_arrow: %s:\n\n> %s",
 			helpers.ReplyToOrFrom(message),
 			strings.Join(strings.Split(md, "\n"), "\n> "),
@@ -198,9 +220,10 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	// save it on the database
 	err = db.SaveEmailReceived(
 		card.ShortLink,
-		message.Id,
-		helpers.Extractsubject(message.Subject),
+		helpers.MessageHeader(message, "Message-Id"),
+		helpers.ExtractSubject(message.Subject),
 		helpers.ReplyToOrFrom(message),
+		comment.Id,
 	)
 	if err != nil {
 		reportError(raygun, err)
@@ -210,6 +233,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
+	log.Print("a Trello webhook was created.")
 	w.WriteHeader(200)
 }
 
@@ -227,10 +251,10 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	var wh struct {
 		Action goTrello.Action `json:"action"`
 	}
-	err = json.NewDecoder(r.Body).Decode(wh)
+	err := json.NewDecoder(r.Body).Decode(&wh)
 	if err != nil {
 		reportError(raygun, err)
-		http.Error(w, err.Error(), 400)
+		sendJSONError(w, err, 400)
 		return
 	}
 
@@ -239,14 +263,16 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var strippedText string
+
 	switch wh.Action.Type {
 	case "deleteCard":
 	// doesn't work because we are storing shortlinks only
 	// db.RemoveCard(wh.Action.Data.Card.Id)
 	case "updateComment":
 		text := wh.Action.Data.Action.Text
-		stripped := helpers.CommentStripPrefix(text)
-		if len(text) == len(stripped) {
+		strippedText = helpers.CommentStripPrefix(text)
+		if len(text) == len(strippedText) {
 			// comment doesn't have prefix
 			return
 		}
@@ -254,73 +280,74 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
 		if err != nil {
 			reportError(raygun, err)
-		} else if email == nil {
+		} else if email.Id == "" {
 			// we couldn't find it, so let's send
 			goto sendMail
 		}
 	case "commentCard":
 		text := wh.Action.Data.Action.Text
-		stripped := helpers.CommentStripPrefix(text)
-		if len(text) == len(stripped) {
+		strippedText = helpers.CommentStripPrefix(text)
+		if len(text) == len(strippedText) {
 			// comment doesn't have prefix
 			return
 		}
 		goto sendMail
-	sendMail:
-		params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
-		if err != nil {
-			reportError(raygun, err)
-			http.Error(w, err.Error(), 503)
-			return
-		}
+	}
+sendMail:
+	params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
+	if err != nil {
+		reportError(raygun, err)
+		sendJSONError(w, err, 503)
+		return
+	}
 
-		// check outbound email address validity
-		sendingAddr := params.OutboundAddr
-		if params.OutboundAddr == "" {
-			sendingAddr = params.InboundAddr
-		} else {
-			domain := strings.Split(params.OutboundAddr, "@")[0]
-			if domain != settings.BaseDomain {
-				if !mailgun.DomainCanSend(domain) {
-					sendingAddr = params.InboundAddr
-				}
+	// check outbound email address validity
+	sendingAddr := params.OutboundAddr
+	if params.OutboundAddr == "" {
+		sendingAddr = params.InboundAddr
+	} else {
+		domain := strings.Split(params.OutboundAddr, "@")[0]
+		if domain != settings.BaseDomain {
+			if !mailgun.DomainCanSend(domain) {
+				sendingAddr = params.InboundAddr
 			}
 		}
+	}
 
-		// actually send
-		messageId, err := mailgun.Send(mailgun.NewMessage{
-			HTML:          helpers.Markdown(stripped),
-			Text:          stripped,
-			Recipients:    params.Recipients,
-			From:          sendingAddr,
-			Subject:       helpers.ExtractSubject(params.LastMail.Subject),
-			InReplyTo:     params.LastMail.Id,
-			ReplyTo:       params.InboundAddr,
-			CardShortLink: wh.Action.Data.Card.ShortLink,
-			CommenterId:   wh.Action.MemberCreator.Id,
-		})
-		if err != nil {
-			reportError(raygun, err)
-			http.Error(w, err.Error(), 503)
-			return
-		}
+	// actually send
+	messageId, err := mailgun.Send(mailgun.NewMessage{
+		ApplyMetadata: true,
+		HTML:          string(gfm.Markdown([]byte(strippedText))),
+		Text:          strippedText,
+		Recipients:    params.Recipients,
+		From:          sendingAddr,
+		Subject:       helpers.ExtractSubject(params.LastMail.Subject),
+		InReplyTo:     params.LastMail.Id,
+		ReplyTo:       params.InboundAddr,
+		CardShortLink: wh.Action.Data.Card.ShortLink,
+		CommenterId:   wh.Action.MemberCreator.Id,
+	})
+	if err != nil {
+		reportError(raygun, err)
+		sendJSONError(w, err, 503)
+		return
+	}
 
-		// save email sent
-		commentId := wh.Action.Data.Action.Id
-		if commentId == "" {
-			commentId := wh.Action.Id
-		}
-		err = db.SaveCommentSent(
-			wh.Action.Data.Card.ShortLink,
-			wh.Action.MemberCreator.Id,
-			messageId,
-			commentId,
-		)
-		if err != nil {
-			reportError(raygun, err)
-			http.Error(w, err.Error(), 500)
-			return
-		}
+	// save email sent
+	commentId := wh.Action.Data.Action.Id
+	if commentId == "" {
+		commentId = wh.Action.Id
+	}
+	err = db.SaveCommentSent(
+		wh.Action.Data.Card.ShortLink,
+		wh.Action.MemberCreator.Id,
+		messageId,
+		commentId,
+	)
+	if err != nil {
+		reportError(raygun, err)
+		sendJSONError(w, err, 500)
+		return
 	}
 }
 

@@ -4,7 +4,8 @@ import (
 	"log"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/mailgun/mailgun-go"
+	gfm "github.com/shurcooL/github_flavored_markdown"
+	"github.com/websitesfortrello/mailgun-go"
 )
 
 type Settings struct {
@@ -39,14 +40,19 @@ func DomainCanSend(domain string) bool {
 
 func Send(params NewMessage) (messageId string, err error) {
 	message := Client.NewMessage(params.From, params.Subject, params.Text, params.Recipients...)
-	message.AddHeader("Reply-To", params.ReplyTo)
-	message.AddHeader("In-Reply-To", params.InReplyTo)
-	message.AddTag(params.From)
-	message.AddVariable("card", params.CardShortLink)
-	message.AddVariable("commenter", params.CommenterId)
+	if params.HTML != "" {
+		params.HTML = string(gfm.Markdown([]byte(params.Text)))
+	}
 	message.SetHtml(params.HTML)
-	message.SetTrackingClicks(false)
-	message.SetTrackingOpens(false)
+	if params.ApplyMetadata {
+		message.AddHeader("Reply-To", params.ReplyTo)
+		message.AddHeader("In-Reply-To", params.InReplyTo)
+		message.AddTag(params.From)
+		message.AddVariable("card", params.CardShortLink)
+		message.AddVariable("commenter", params.CommenterId)
+		message.SetTrackingClicks(false)
+		message.SetTrackingOpens(false)
+	}
 	status, messageId, err := Client.Send(message)
 	if err != nil {
 		log.Print("error sending email: ", status)

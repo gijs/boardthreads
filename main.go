@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -23,6 +24,7 @@ type Settings struct {
 	BaseDomain     string `envconfig:"BASE_DOMAIN"`
 	SessionSecret  string `envconfig:"SESSION_SECRET"`
 	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
+	MailgunAPIKey  string `envconfig:"MAILGUN_API_KEY"`
 	TrelloBotId    string `envconfig:"TRELLO_BOT_ID"`
 }
 
@@ -58,15 +60,21 @@ func main() {
 	middle.UseHandler(router)
 
 	router.Path("/api/session").Methods("POST").HandlerFunc(SetSession)
-	router.Path("/api/account").Methods("GET").Handler(jwtMiddle.Handler(http.HandlerFunc(GetAccount)))
-	router.Path("/api/account").Methods("PUT").Handler(jwtMiddle.Handler(http.HandlerFunc(SetAccount)))
+	router.Path("/api/account").Methods("GET").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(GetAccount)))
+	router.Path("/api/account").Methods("PUT").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(SetAccount)))
+	router.Path("/api/addresses/{address}").Methods("PUT").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(SetAddress)))
+	router.Path("/api/addresses/{address}").Methods("DELETE").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(DeleteAddress)))
 
-	router.Path("/webhook/mailgun/email").Methods("POST").HandlerFunc(MailgunIncoming)
-	router.Path("/webhook/mailgun/success").Methods("POST").HandlerFunc(MailgunSuccess)
-	router.Path("/webhook/mailgun/failure").Methods("POST").HandlerFunc(MailgunFailure)
-	router.Path("/webhook/trello/card").Methods("HEAD").HandlerFunc(TrelloCardWebhookCreation)
-	router.Path("/webhook/trello/card").Methods("POST").HandlerFunc(TrelloCardWebhook)
-	router.Path("/webhook/segment/tracking").Methods("POST").HandlerFunc(SegmentTracking)
+	router.Path("/webhooks/mailgun/email").Methods("POST").HandlerFunc(MailgunIncoming)
+	router.Path("/webhooks/mailgun/success").Methods("POST").HandlerFunc(MailgunSuccess)
+	router.Path("/webhooks/mailgun/failure").Methods("POST").HandlerFunc(MailgunFailure)
+	router.Path("/webhooks/trello/card").Methods("HEAD").HandlerFunc(TrelloCardWebhookCreation)
+	router.Path("/webhooks/trello/card").Methods("POST").HandlerFunc(TrelloCardWebhook)
+	router.Path("/webhooks/segment/tracking").Methods("POST").HandlerFunc(SegmentTracking)
 
 	server := &graceful.Server{
 		Timeout: 2 * time.Second,
@@ -90,4 +98,11 @@ func reportError(raygun *raygun4go.Client, err error) {
 	} else {
 		raygun.CreateError(err.Error())
 	}
+}
+
+func sendJSONError(w http.ResponseWriter, err error, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(err.Error())
 }

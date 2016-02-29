@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/mailgun/mailgun-go"
+	"github.com/websitesfortrello/mailgun-go"
 )
 
 func HTMLToMarkdown(html string) (md string, err error) {
@@ -33,14 +33,17 @@ func ExtractSubject(subject string) string {
 	return subject
 }
 
-func DownloadFile(path string, url string) (err error) {
+func DownloadFile(path, url, authName, authPassword string) (err error) {
 	out, err := os.Create(path)
 	if err != nil {
 		return
 	}
 	defer out.Close()
 
-	resp, err := http.Get(url)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.SetBasicAuth(authName, authPassword)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
@@ -55,12 +58,20 @@ func DownloadFile(path string, url string) (err error) {
 }
 
 func ReplyToOrFrom(message mailgun.StoredMessage) string {
-	for _, header := range message.MessageHeaders {
-		if header[0] == "Reply-To" {
-			return header[1]
-		}
+	replyto := MessageHeader(message, "Reply-To")
+	if replyto != "" {
+		return replyto
 	}
 	return message.From
+}
+
+func MessageHeader(message mailgun.StoredMessage, header string) string {
+	for _, pair := range message.MessageHeaders {
+		if pair[0] == header {
+			return pair[1]
+		}
+	}
+	return ""
 }
 
 func CommentStripPrefix(text string) string {

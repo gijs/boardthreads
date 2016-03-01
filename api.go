@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/MindscapeHQ/raygun4go"
@@ -97,9 +96,8 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	data := struct {
-		BoardShortLink string `json:"boardShortLink"`
-		ListId         string `json:"listId"`
-		InboundAddr    string `json:"inboundAddr"`
+		ListId      string `json:"listId"`
+		InboundAddr string `json:"inboundAddr"`
 	}{
 		InboundAddr: vars["address"] + "@" + settings.BaseDomain,
 	}
@@ -120,15 +118,12 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	board, err := trello.Client.Board(list.IdBoard)
 	if err != nil {
 		reportError(raygun, err)
-		sendJSONError(w, err, 400)
+		sendJSONError(w, err, 403)
 		return
 	}
 
-	p := strings.Split(board.ShortUrl, "/")
-	data.BoardShortLink = p[len(p)-1]
-
 	// adding address to db
-	ok, err := db.SetupNewAddress(userId, data.BoardShortLink, data.ListId, data.InboundAddr)
+	ok, err := db.SetupNewAddress(userId, board.ShortLink, data.ListId, data.InboundAddr)
 	if err != nil {
 		reportError(raygun, err)
 		sendJSONError(w, err, 500)
@@ -159,7 +154,7 @@ Remember: to send replies you can just write a normal comment, only prefixed wit
 		InboundAddr:    data.InboundAddr,
 		OutboundAddr:   data.InboundAddr,
 		ListId:         data.ListId,
-		BoardShortLink: data.BoardShortLink,
+		BoardShortLink: board.ShortLink,
 	})
 }
 

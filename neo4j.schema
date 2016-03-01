@@ -1,7 +1,7 @@
 (:User {id})
 (:Board {shortLink})
 (:List {id})
-(:Card {shortLink, webhookId})
+(:Card {shortLink, id, webhookId})
 (:EmailAddress {address, date})
 (:Domain {domain})
 (:Mail {id, date, subject, from, commentId})

@@ -17,8 +17,8 @@ type Domain struct {
 }
 
 type Email struct {
-	Date      types.NullTime `json:"date"      db:"date"`
 	Id        string         `json:"id"        db:"id"`
+	Date      types.NullTime `json:"date"      db:"date"`
 	Subject   string         `json:"subject"   db:"subject"`
 	From      string         `json:"from"      db:"from"`
 	CommentId string         `json:"commentId" db:"commentId"`

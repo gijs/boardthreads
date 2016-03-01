@@ -94,18 +94,21 @@ subject: %s
 	return
 }
 
-func CreateWebhook(entityId string, endpoint string) (string, error) {
+func CreateWebhook(entityId, endpoint string) (string, error) {
 	params := url.Values{}
 	params.Add("idModel", entityId)
 	params.Add("callbackURL", endpoint)
 
-	body, err := Client.Put("/1/webhooks", params)
+	body, err := Client.Put("/webhooks", params)
+	if err != nil {
+		return "", err
+	}
 
 	var data struct {
 		Id string `json:"id"`
 	}
-	if err = json.Unmarshal(body, data); err != nil {
-		return "", nil
+	if err = json.Unmarshal(body, &data); err != nil {
+		return "", err
 	}
 
 	return data.Id, nil

@@ -5,6 +5,7 @@ import (
 	"bt/helpers"
 	"bt/mailgun"
 	"bt/trello"
+
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -70,13 +71,16 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			sendJSONError(w, err, 503)
 			return nil
 		}
-		webhookId, err := trello.CreateWebhook(card.Id, settings.WebhookHandler)
+		card, err = trello.Client.Card(card.Id)
+
+		webhookId, err := trello.CreateWebhook(card.Id, settings.WebhookHandler+"/webhooks/trello/card")
 		if err != nil {
 			reportError(raygun, err)
 			sendJSONError(w, err, 503)
 			return nil
 		}
-		err = db.SaveCardWithEmail(recipient, card.ShortLink, webhookId)
+
+		err = db.SaveCardWithEmail(recipient, card.ShortLink, card.Id, webhookId)
 		if err != nil {
 			reportError(raygun, err)
 			sendJSONError(w, err, 500)
@@ -87,10 +91,12 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// get card for this mail message, if exists (and is valid)
 	shortLink, err := db.GetCardForMessage(
-		helpers.MessageHeader(message, "Message-Id"), message.Subject, recipient)
-
-	// "no rows" is an error. but that's actually a valid result for us
-	if err != nil && !strings.HasPrefix(err.Error(), "sql: no rows in result set") {
+		helpers.MessageHeader(message, "In-Reply-To"),
+		message.Subject,
+		helpers.ReplyToOrFrom(message),
+		recipient,
+	)
+	if err != nil {
 		reportError(raygun, err)
 		sendJSONError(w, err, 404)
 		return
@@ -99,8 +105,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	var card *goTrello.Card
 	if shortLink != "" {
 		// card exists
-		c, err := trello.Client.Card(shortLink)
-		card = c
+		card, err = trello.Client.Card(shortLink)
 		if err != nil {
 			// card doesn't exist on trello, delete it from db
 			err = db.RemoveCard(shortLink)
@@ -132,6 +137,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// if something fails during the card creation process `card` will be nil
 	// now upload attachments
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
@@ -157,6 +163,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// upload the message as an attachment
+	var attachedBody *goTrello.Attachment
 	for {
 		if message.BodyHtml == "" {
 			// message body html is empty, no need to upload
@@ -188,7 +195,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			reportError(raygun, err)
 			break
 		}
-		_, err = card.UploadAttachment(msgdst)
+		attachedBody, err = card.UploadAttachment(msgdst)
 		if err != nil {
 			reportError(raygun, err)
 			break
@@ -207,18 +214,26 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
+	prefix := ":envelope_with_arrow:"
+	if attachedBody != nil {
+		prefix = fmt.Sprintf("[%s](%s)", prefix, attachedBody.Url)
+	}
 	comment, err := card.AddComment(
-		fmt.Sprintf(":envelope_with_arrow: %s:\n\n> %s",
+		fmt.Sprintf("%s %s:\n\n> %s",
+			prefix,
 			helpers.ReplyToOrFrom(message),
 			strings.Join(strings.Split(md, "\n"), "\n> "),
 		),
 	)
 	if err != nil {
 		reportError(raygun, err)
+		sendJSONError(w, err, 503)
+		return
 	}
 
 	// save it on the database
 	err = db.SaveEmailReceived(
+		card.Id,
 		card.ShortLink,
 		helpers.MessageHeader(message, "Message-Id"),
 		helpers.ExtractSubject(message.Subject),
@@ -227,6 +242,8 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		reportError(raygun, err)
+		sendJSONError(w, err, 503)
+		return
 	}
 
 	w.WriteHeader(200)
@@ -246,7 +263,6 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	*/
 
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
-	w.WriteHeader(200)
 
 	var wh struct {
 		Action goTrello.Action `json:"action"`
@@ -258,46 +274,63 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var strippedText string
+
 	// filter out bot actions
 	if wh.Action.MemberCreator.Id == settings.TrelloBotId {
+		goto abort
 		return
 	}
 
-	var strippedText string
+	log.Print("got webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
 
 	switch wh.Action.Type {
 	case "deleteCard":
-	// doesn't work because we are storing shortlinks only
-	// db.RemoveCard(wh.Action.Data.Card.Id)
+		db.RemoveCard(wh.Action.Data.Card.Id)
+		w.WriteHeader(202)
+		return
 	case "updateComment":
 		text := wh.Action.Data.Action.Text
 		strippedText = helpers.CommentStripPrefix(text)
-		if len(text) == len(strippedText) {
+		if text == strippedText {
 			// comment doesn't have prefix
-			return
+			goto abort
 		}
 		// see if we have already sent this message
 		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
 		if err != nil {
+			// a real error
 			reportError(raygun, err)
+			goto abort
 		} else if email.Id == "" {
 			// we couldn't find it, so let's send
 			goto sendMail
+		} else {
+			// we found it
+			goto abort
 		}
 	case "commentCard":
-		text := wh.Action.Data.Action.Text
+		text := wh.Action.Data.Text
 		strippedText = helpers.CommentStripPrefix(text)
-		if len(text) == len(strippedText) {
+		if text == strippedText {
 			// comment doesn't have prefix
-			return
+			goto abort
 		}
 		goto sendMail
+	default:
+		w.WriteHeader(202)
+		return
 	}
+abort:
+	log.Print("webhook handling aborted.")
+	w.WriteHeader(202)
+	return
 sendMail:
 	params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
 	if err != nil {
+		log.Print("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
 		reportError(raygun, err)
-		sendJSONError(w, err, 503)
+		sendJSONError(w, err, 404)
 		return
 	}
 
@@ -321,8 +354,8 @@ sendMail:
 		Text:          strippedText,
 		Recipients:    params.Recipients,
 		From:          sendingAddr,
-		Subject:       helpers.ExtractSubject(params.LastMail.Subject),
-		InReplyTo:     params.LastMail.Id,
+		Subject:       helpers.ExtractSubject(params.LastMailSubject),
+		InReplyTo:     params.LastMailId,
 		ReplyTo:       params.InboundAddr,
 		CardShortLink: wh.Action.Data.Card.ShortLink,
 		CommenterId:   wh.Action.MemberCreator.Id,
@@ -349,6 +382,8 @@ sendMail:
 		sendJSONError(w, err, 500)
 		return
 	}
+
+	w.WriteHeader(200)
 }
 
 func SegmentTracking(w http.ResponseWriter, r *http.Request) {}

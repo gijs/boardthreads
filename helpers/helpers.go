@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,6 +19,18 @@ func HTMLToMarkdown(html string) (md string, err error) {
 	return string(mdBytes), err
 }
 
+func ParseEmailAddress(from string) string {
+	command := exec.Command("./parseEmailAddress")
+	stdin, err := command.StdinPipe()
+	stdin.Write([]byte(from))
+	addrBytes, err := command.Output()
+	if err != nil {
+		log.Print("./parseEmailAddress failed with " + from)
+		return from
+	}
+	return string(addrBytes)
+}
+
 func ExtractSubject(subject string) string {
 	subject = strings.Trim(subject, " ")
 	for i := 0; i < 3; i++ {
@@ -29,8 +42,12 @@ func ExtractSubject(subject string) string {
 		subject = strings.TrimPrefix(subject, "RE:")
 		subject = strings.TrimPrefix(subject, "FWD:")
 		subject = strings.TrimPrefix(subject, "ENC:")
+		subject = strings.TrimPrefix(subject, "Fw:")
+		subject = strings.TrimPrefix(subject, "Re:")
+		subject = strings.TrimPrefix(subject, "Fwd:")
+		subject = strings.TrimPrefix(subject, "Enc:")
 	}
-	return subject
+	return strings.TrimSpace(subject)
 }
 
 func DownloadFile(path, url, authName, authPassword string) (err error) {

@@ -2,6 +2,7 @@ package db
 
 import (
 	"bt/helpers"
+	"errors"
 	"log"
 
 	"github.com/jmoiron/sqlx"
@@ -129,7 +130,7 @@ RETURN l.id AS listId
 	return
 }
 
-func GetCardForMessage(messageId, messageSubject, currentAddress string) (string, error) {
+func GetCardForMessage(messageId, messageSubject, senderAddress, recipientAddress string) (string, error) {
 	var queryResult struct {
 		ShortLink   string         `db:"cardShortLink"`
 		Address     string         `db:"address"`
@@ -137,7 +138,8 @@ func GetCardForMessage(messageId, messageSubject, currentAddress string) (string
 		Expired     bool           `db:"expired"`
 	}
 	err := DB.Get(&queryResult, `
-MATCH (m:Mail) WHERE m.id = {0} OR ((m.subject = {0} OR m.subject = {1}) AND m.from = {2})
+MATCH (m:Mail) WHERE m.id = {0} OR
+                     ((m.subject = {1} OR m.subject = {2}) AND m.from = {3})
 MATCH (m)--(c:Card)--(addr:EmailAddress)
 
 WITH addr, c, MAX(m.date) AS last
@@ -148,9 +150,17 @@ RETURN
  last,
  (TIMESTAMP() - last > 1000*60*60*24*15) AS expired // expiration: 15 days
 LIMIT 1
-    `, messageId, messageSubject, helpers.ExtractSubject(messageSubject))
+    `, messageId,
+		messageSubject, helpers.ExtractSubject(messageSubject), senderAddress)
+
 	if err != nil {
-		return "", err
+		// a real error
+		if err.Error() != "sql: no rows in result set" {
+			return "", err
+		} else {
+			// nothing found
+			return "", nil
+		}
 	}
 
 	// old messages are ignored so that we create a new card
@@ -159,45 +169,68 @@ LIMIT 1
 	}
 
 	// cards that are somehow tied to a different @boardthreads address are also ignored
-	if queryResult.Address != currentAddress {
+	if queryResult.Address != recipientAddress {
 		return "", nil
 	}
 
 	return queryResult.ShortLink, nil
 }
 
-func SaveCardWithEmail(emailAddress, cardShortLink, webhookId string) (err error) {
+func SaveCardWithEmail(emailAddress, cardShortLink, cardId, webhookId string) (err error) {
+	if cardShortLink == "" || cardId == "" || webhookId == "" {
+		log.Print("SaveCardWithEmail got arguments: ", emailAddress, ", ", cardShortLink, ", ", cardId, ", ", webhookId)
+		return errors.New("missing argument to SaveCardWithEmail.")
+	}
+
 	_, err = DB.Exec(`
 MERGE (addr:EmailAddress {address: {0}})
 MERGE (c:Card {shortLink: {1}})
 MERGE (c)-[:LINKED_TO]->(addr)
       
 WITH c
-SET c.webhookId = {2}
-    `, emailAddress, cardShortLink, webhookId)
+SET c.id = {2}
+SET c.webhookId = {3}
+    `, emailAddress, cardShortLink, cardId, webhookId)
 	return
 }
 
-func RemoveCard(shortLink string) (err error) {
+func RemoveCard(id string) (err error) {
 	_, err = DB.Exec(`
-MATCH (c:Card {shortLink: {0}})
+MATCH (c:Card)
+  WHERE c.shortLink = {0} OR c.id = {0}
 MATCH (c)-[r]-(m:Mail)
 MATCH (c)-[l]-(:EmailAddress)
 DELETE c, r, l, m
-    `, shortLink)
+    `, id)
 	return
 }
 
 func GetEmailFromCommentId(commentId string) (email Email, err error) {
-	err = DB.Get(&email, `MATCH (m:Mail {commentId: {0}}) RETURN m`, commentId)
-	return
+	err = DB.Get(&email, `
+MATCH (m:Mail {commentId: {0}})
+RETURN
+  m.id AS id,
+  m.date AS date,
+  CASE WHEN m.subject THEN m.subject ELSE '' END AS subject,
+  CASE WHEN m.from THEN m.from ELSE '' END AS from,
+  m.commentId AS commentId
+    `, commentId)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return Email{}, nil
+		} else {
+			return Email{}, err
+		}
+	}
+	return email, nil
 }
 
 func GetEmailParamsForCard(shortLink string) (params struct {
-	LastMail     Email    `db:"lastMail"`
-	InboundAddr  string   `db:"inbound"`
-	OutboundAddr string   `db:"outbound"`
-	Recipients   []string `db:"recipients"`
+	LastMailId      string   `db:"lastMailId"`
+	LastMailSubject string   `db:"lastMailSubject"`
+	InboundAddr     string   `db:"inbound"`
+	OutboundAddr    string   `db:"outbound"`
+	Recipients      []string `db:"recipients"`
 }, err error) {
 	err = DB.Get(&params, `
 MATCH (c:Card {shortLink: {0}})--(addr:EmailAddress)
@@ -212,7 +245,8 @@ WITH
  collect(DISTINCT m.from) AS recipients
         
 RETURN
- lastMail,
+ lastMail.id AS lastMailId,
+ lastMail.subject AS lastMailSubject,
  addr.address AS inbound,
  outbound.address AS outbound,
  recipients
@@ -220,7 +254,7 @@ LIMIT 1`, shortLink)
 	return
 }
 
-func SaveEmailReceived(cardShortLink, messageId, subject, from, commentId string) (err error) {
+func SaveEmailReceived(cardId, cardShortLink, messageId, subject, from, commentId string) (err error) {
 	_, err = DB.Exec(`
 MERGE (c:Card {shortLink: {0}})
 MERGE (m:Mail {
@@ -231,7 +265,10 @@ MERGE (m:Mail {
   date: TIMESTAMP()
 })
 MERGE (c)-[:CONTAINS]->(m)
-`, cardShortLink, messageId, subject, from, commentId)
+
+WITH c
+  SET c.id = {5}
+`, cardShortLink, messageId, subject, from, commentId, cardId)
 	return
 }
 

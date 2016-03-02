@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/MindscapeHQ/raygun4go"
+	log "github.com/Sirupsen/logrus"
 	"github.com/auth0/go-jwt-middleware"
 	"github.com/carbocation/interpose"
 	"github.com/carbocation/interpose/adaptors"
@@ -32,6 +32,8 @@ var settings Settings
 
 func main() {
 	envconfig.Process("", &settings)
+
+	log.SetLevel(log.DebugLevel)
 
 	jwtMiddle := jwtmiddleware.New(jwtmiddleware.Options{
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {

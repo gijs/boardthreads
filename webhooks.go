@@ -166,43 +166,46 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// upload the message as an attachment
-	var attachedBody *goTrello.Attachment
+	var attachedBody goTrello.Attachment
 	for {
-		if message.BodyHtml == "" {
-			// message body html is empty, no need to upload
-			break
-		}
+		ext := ".txt"
+		body := message.BodyPlain // default case, 'body-plain' is always present.
+		if message.BodyHtml != "" {
+			// the normal case, almost always there is a body-html
+			ext = "html"
+			body = message.BodyHtml
 
-		// replace content-id mapped images
-		bodyHtml := message.BodyHtml
-		for cid, meta := range message.ContentIDMap {
-			cid = strings.Trim(cid, "<>")
-			oldUrl := meta.Url
-			var newUrl string
-			var ok bool
-			if newUrl, ok = attachmentUrls[oldUrl]; !ok {
-				// something is wrong here, continue
-				log.Warn("didn't found the newUrl for a cid attachment.")
-				continue
+			// replace content-id mapped images
+			for cid, meta := range message.ContentIDMap {
+				cid = strings.Trim(cid, "<>")
+				oldUrl := meta.Url
+				var newUrl string
+				var ok bool
+				if newUrl, ok = attachmentUrls[oldUrl]; !ok {
+					// something is wrong here, continue
+					log.Warn("didn't found the newUrl for a cid attachment.")
+					continue
+				}
+				body = strings.Replace(body, "cid:"+cid, newUrl, -1)
 			}
-			bodyHtml = strings.Replace(bodyHtml, "cid:"+cid, newUrl, -1)
 		}
 
 		// save body-html as a temporary file then upload it
 		msgdst := filepath.Join(
 			dir,
-			time.Now().Format("2006-01-02T15:04:05Z-0700MST")+message.Sender+".html",
+			time.Now().Format("2006-01-02T15:04:05Z-0700MST")+message.Sender+"."+ext,
 		)
-		err = ioutil.WriteFile(msgdst, []byte(bodyHtml), 0644)
+		err = ioutil.WriteFile(msgdst, []byte(body), 0644)
 		if err != nil {
 			reportError(raygun, err)
 			break
 		}
-		attachedBody, err = card.UploadAttachment(msgdst)
+		attachedBody_, err := card.UploadAttachment(msgdst)
 		if err != nil {
 			reportError(raygun, err)
 			break
 		}
+		attachedBody = *attachedBody_
 		break
 	}
 
@@ -218,21 +221,27 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// post the message as comment
 	log.Info("--> posting comment")
-	prefix := ":envelope_with_arrow:"
-	if attachedBody != nil {
-		prefix = fmt.Sprintf("[%s](%s)", prefix, attachedBody.Url)
-	}
-	comment, err := card.AddComment(
-		fmt.Sprintf("%s %s:\n\n> %s",
-			prefix,
-			helpers.ReplyToOrFrom(message),
-			strings.Join(strings.Split(md, "\n"), "\n> "),
-		),
+	prefix := fmt.Sprintf("[:envelope_with_arrow:](%s)", attachedBody.Url)
+	commentText := fmt.Sprintf("%s %s:\n\n> %s",
+		prefix,
+		helpers.ReplyToOrFrom(message),
+		strings.Join(strings.Split(md, "\n"), "\n> "),
 	)
+
+	if len(commentText) > 15000 {
+		commentText = commentText[:1500] +
+			fmt.Sprintf("\n\n---\n\nMESSAGE TRUNCATED, see [attachment](%s).", attachedBody.Url)
+	}
+
+	comment, err := card.AddComment(commentText)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"card": card.ShortLink,
+			"err":  err.Error(),
+		}).Error("couldn't post the comment")
 		reportError(raygun, err)
-		sendJSONError(w, err, 503)
 		return
+		// do not return an error or the webhook will retry and more cards will be created
 	}
 
 	// save it on the database
@@ -245,9 +254,15 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		comment.Id,
 	)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"email":   helpers.MessageHeader(message, "Message-Id"),
+			"card":    card.ShortLink,
+			"comment": comment.Id,
+			"err":     err.Error(),
+		}).Error("couldn't save the email received")
 		reportError(raygun, err)
-		sendJSONError(w, err, 503)
 		return
+		// do not return an error or the webhook will retry and more cards will be created
 	}
 
 	w.WriteHeader(200)

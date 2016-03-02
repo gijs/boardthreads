@@ -74,6 +74,7 @@ func main() {
 	router.Path("/webhooks/mailgun/failure").Methods("POST").HandlerFunc(MailgunFailure)
 	router.Path("/webhooks/trello/card").Methods("HEAD", "GET").HandlerFunc(TrelloCardWebhookCreation)
 	router.Path("/webhooks/trello/card").Methods("POST").HandlerFunc(TrelloCardWebhook)
+	router.Path("/webhooks/trello/{card}").Methods("POST").HandlerFunc(TrelloCardWebhook)
 	router.Path("/webhooks/segment/tracking").Methods("POST").HandlerFunc(SegmentTracking)
 
 	server := &graceful.Server{

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/MindscapeHQ/raygun4go"
+	log "github.com/Sirupsen/logrus"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 
 	goTrello "github.com/websitesfortrello/go-trello"
@@ -44,6 +44,8 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	recipient := r.PostFormValue("recipient")
 	url := r.PostFormValue("message-url")
+
+	log.Info("mail to ", recipient, " ", url)
 
 	// target list for this email
 	listId, err := db.GetTargetListForEmailAddress(recipient)
@@ -139,6 +141,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// if something fails during the card creation process `card` will be nil
 	// now upload attachments
+	log.Info("--> uploading attachments... ", len(message.Attachments))
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
 	attachmentUrls := make(map[string]string)
@@ -148,13 +151,13 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			filedst := filepath.Join(dir, mailAttachment.Name)
 			err = helpers.DownloadFile(filedst, mailAttachment.Url, "api", settings.MailgunAPIKey)
 			if err != nil {
-				log.Print("download of " + mailAttachment.Url + " failed: " + err.Error())
+				log.Warn("download of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
 			trelloAttachment, err := card.UploadAttachment(filedst)
 			if err != nil {
-				log.Print("upload of " + mailAttachment.Url + " failed: " + err.Error())
+				log.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
@@ -179,7 +182,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			var ok bool
 			if newUrl, ok = attachmentUrls[oldUrl]; !ok {
 				// something is wrong here, continue
-				log.Print("didn't found the newUrl for a cid attachment.")
+				log.Warn("didn't found the newUrl for a cid attachment.")
 				continue
 			}
 			bodyHtml = strings.Replace(bodyHtml, "cid:"+cid, newUrl, -1)
@@ -214,6 +217,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
+	log.Info("--> posting comment")
 	prefix := ":envelope_with_arrow:"
 	if attachedBody != nil {
 		prefix = fmt.Sprintf("[%s](%s)", prefix, attachedBody.Url)
@@ -250,7 +254,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
-	log.Print("a Trello webhook was created.")
+	log.Info("a Trello webhook was created.")
 	w.WriteHeader(200)
 }
 
@@ -282,7 +286,7 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Print("got webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
+	log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
 
 	switch wh.Action.Type {
 	case "deleteCard":
@@ -322,13 +326,13 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 abort:
-	log.Print("webhook handling aborted.")
+	log.Info("webhook handling aborted.")
 	w.WriteHeader(202)
 	return
 sendMail:
 	params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
 	if err != nil {
-		log.Print("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
+		log.Info("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
 		reportError(raygun, err)
 		sendJSONError(w, err, 404)
 		return

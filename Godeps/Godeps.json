@@ -12,6 +12,11 @@
 			"Rev": "64c390247031952f6e8d6153c620f41c064a03ee"
 		},
 		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.7-49-gcdaedc6",
+			"Rev": "cdaedc68f2894175ac2b3221869685602c759e71"
+		},
+		{
 			"ImportPath": "github.com/auth0/go-jwt-middleware",
 			"Rev": "731fd2f34fda4c4a7c22816f2167e2d310cb1e42"
 		},

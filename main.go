@@ -34,6 +34,7 @@ func main() {
 	envconfig.Process("", &settings)
 
 	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{ForceColors: true})
 
 	jwtMiddle := jwtmiddleware.New(jwtmiddleware.Options{
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
@@ -97,7 +98,7 @@ func main() {
 
 func reportError(raygun *raygun4go.Client, err error) {
 	if raygun == nil {
-		log.Print(err.Error())
+		log.WithFields(log.Fields{"err": err.Error()}).Error("reportError")
 	} else {
 		raygun.CreateError(err.Error())
 	}

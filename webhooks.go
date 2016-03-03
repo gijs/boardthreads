@@ -45,7 +45,10 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	recipient := r.PostFormValue("recipient")
 	url := r.PostFormValue("message-url")
 
-	log.Info("mail to ", recipient, " ", url)
+	log.WithFields(log.Fields{
+		"recipient": recipient,
+		"url":       url,
+	}).Info("got mail")
 
 	// target list for this email
 	listId, err := db.GetTargetListForEmailAddress(recipient)
@@ -141,7 +144,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// if something fails during the card creation process `card` will be nil
 	// now upload attachments
-	log.Info("--> uploading attachments... ", len(message.Attachments))
+	log.WithFields(log.Fields{"quantity": len(message.Attachments)}).Info("uploading attachments")
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
 	attachmentUrls := make(map[string]string)
@@ -220,7 +223,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
-	log.Info("--> posting comment")
+	log.WithFields(log.Fields{"card": card.ShortLink}).Info("posting comment")
 	prefix := fmt.Sprintf("[:envelope_with_arrow:](%s)", attachedBody.Url)
 	commentText := fmt.Sprintf("%s %s:\n\n> %s",
 		prefix,
@@ -303,12 +306,12 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 
 	switch wh.Action.Type {
 	case "deleteCard":
-		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
+		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
 		db.RemoveCard(wh.Action.Data.Card.Id)
 		w.WriteHeader(202)
 		return
 	case "updateComment":
-		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
+		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
 		text := wh.Action.Data.Action.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {
@@ -329,7 +332,7 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 			goto abort
 		}
 	case "commentCard":
-		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
+		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
 		text := wh.Action.Data.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {

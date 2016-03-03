@@ -2,6 +2,7 @@ package mailgun
 
 import (
 	"log"
+	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 	gfm "github.com/shurcooL/github_flavored_markdown"
@@ -31,9 +32,21 @@ func DomainCanSend(domain string) bool {
 	if err != nil {
 		return false
 	}
-	log.Print("domain ", domain)
+
+	var include bool
+	var domainkey bool
 	for _, dns := range sending {
 		log.Print("  ", dns.RecordType, " ", dns.Name, " ", dns.Value, " ", dns.Valid)
+		if dns.Valid == "valid" && dns.RecordType == "TXT" {
+			if dns.Name == domain && strings.Contains(dns.Value, "include") {
+				include = true
+			} else if strings.HasSuffix(dns.Name, "domainkey."+domain) {
+				domainkey = true
+			}
+		}
+	}
+	if include && domainkey {
+		return true
 	}
 	return false
 }

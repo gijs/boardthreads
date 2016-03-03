@@ -358,8 +358,9 @@ sendMail:
 	if params.OutboundAddr == "" {
 		sendingAddr = params.InboundAddr
 	} else {
-		domain := strings.Split(params.OutboundAddr, "@")[0]
+		domain := strings.Split(params.OutboundAddr, "@")[1]
 		if domain != settings.BaseDomain {
+			log.Debug("trying the address ", sendingAddr, ", domain ", domain)
 			if !mailgun.DomainCanSend(domain) {
 				sendingAddr = params.InboundAddr
 			}

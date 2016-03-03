@@ -69,7 +69,7 @@ func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *
 
 	card, err = list.AddCard(trello.Card{
 		IdList: listId,
-		Name:   fmt.Sprintf("%s :: %s", message.From, helpers.ExtractSubject(message.Subject)),
+		Name:   fmt.Sprintf("%s :: %s", helpers.ReplyToOrFrom(message), helpers.ExtractSubject(message.Subject)),
 		Desc: fmt.Sprintf(`
 ---
 

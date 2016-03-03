@@ -301,14 +301,14 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
-
 	switch wh.Action.Type {
 	case "deleteCard":
+		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
 		db.RemoveCard(wh.Action.Data.Card.Id)
 		w.WriteHeader(202)
 		return
 	case "updateComment":
+		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
 		text := wh.Action.Data.Action.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {
@@ -329,6 +329,7 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 			goto abort
 		}
 	case "commentCard":
+		log.Info("webhook ", wh.Action.Type, " for ", wh.Action.Data.Card.Id)
 		text := wh.Action.Data.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {
@@ -341,7 +342,6 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 abort:
-	log.Info("webhook handling aborted.")
 	w.WriteHeader(202)
 	return
 sendMail:
@@ -365,6 +365,10 @@ sendMail:
 			}
 		}
 	}
+	log.WithFields(log.Fields{
+		"to":   params.Recipients,
+		"from": sendingAddr,
+	}).Info("sending email")
 
 	// actually send
 	messageId, err := mailgun.Send(mailgun.NewMessage{

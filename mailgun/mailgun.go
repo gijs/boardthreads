@@ -36,7 +36,6 @@ func DomainCanSend(domain string) bool {
 	var include bool
 	var domainkey bool
 	for _, dns := range sending {
-		log.Print("  ", dns.RecordType, " ", dns.Name, " ", dns.Value, " ", dns.Valid)
 		if dns.Valid == "valid" && dns.RecordType == "TXT" {
 			if dns.Name == domain && strings.Contains(dns.Value, "include") {
 				include = true

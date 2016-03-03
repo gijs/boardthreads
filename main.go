@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -34,7 +35,11 @@ func main() {
 	envconfig.Process("", &settings)
 
 	log.SetLevel(log.DebugLevel)
-	log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:      true,
+		DisableTimestamp: true,
+		DisableSorting:   true,
+	})
 
 	jwtMiddle := jwtmiddleware.New(jwtmiddleware.Options{
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
@@ -58,6 +63,14 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders: []string{"Content-Type", "Accept", "Authorization"},
 	})))
+	middle.Use(func(next http.Handler) http.Handler {
+		// request id
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var src = rand.NewSource(time.Now().UnixNano())
+			context.Set(r, "request-id", RandStringBytesMaskImprSrc(src, 6))
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	router := mux.NewRouter()
 	middle.UseHandler(router)
@@ -107,6 +120,32 @@ func reportError(raygun *raygun4go.Client, err error) {
 func sendJSONError(w http.ResponseWriter, err error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	log.WithFields(log.Fields{"code": code}).Error("returned JSON error")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(err.Error())
+}
+
+const (
+	letterBytes   = "abcdefghijklmnopqrstuvwxyz0987654321"
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+func RandStringBytesMaskImprSrc(src rand.Source, n int) string {
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return string(b)
 }

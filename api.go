@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MindscapeHQ/raygun4go"
+	log "github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
@@ -31,6 +32,10 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// who is this user in Trello?
+	log.WithFields(log.Fields{
+		"ip":    r.RemoteAddr,
+		"token": data.TrelloToken,
+	}).Info("logging in")
 	user, err := trello.UserFromToken(data.TrelloToken)
 	if err != nil {
 		reportError(raygun, err)
@@ -39,6 +44,10 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ensure we have it on our database
+	log.WithFields(log.Fields{
+		"ip":   r.RemoteAddr,
+		"user": user.Id,
+	}).Info("fetching/saving user on db")
 	err = db.EnsureUser(user.Id)
 	if err != nil {
 		reportError(raygun, err)
@@ -57,6 +66,10 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 		sendJSONError(w, err, 500)
 		return
 	}
+	log.WithFields(log.Fields{
+		"ip":   r.RemoteAddr,
+		"user": user.Id,
+	}).Info("logged in")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"jwt": jwtString})
@@ -108,6 +121,13 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.WithFields(log.Fields{
+		"ip":      r.RemoteAddr,
+		"user":    userId,
+		"address": data.InboundAddr,
+		"list":    data.ListId,
+	}).Info("creating address")
+
 	// fetch board
 	list, err := trello.Client.List(data.ListId)
 	if err != nil {
@@ -129,6 +149,12 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		sendJSONError(w, err, 500)
 		return
 	}
+
+	log.WithFields(log.Fields{
+		"ip":      r.RemoteAddr,
+		"address": data.InboundAddr,
+		"list":    data.ListId,
+	}).Info("saved to db")
 
 	if !ok {
 		sendJSONError(w, err, 401)
@@ -167,6 +193,12 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 	*/
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
 	vars := mux.Vars(r)
+
+	log.WithFields(log.Fields{
+		"ip":      r.RemoteAddr,
+		"address": vars["address"] + "@" + settings.BaseDomain,
+		"user":    userId,
+	}).Info("deleting address")
 
 	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
 	if err != nil {

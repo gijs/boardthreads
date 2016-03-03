@@ -17,6 +17,7 @@ import (
 
 	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 
 	goTrello "github.com/websitesfortrello/go-trello"
@@ -39,13 +40,14 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	   post message html as attachment to the card
 	   post message as markdown as a comment to the card
 	*/
+	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	r.ParseForm()
 	recipient := r.PostFormValue("recipient")
 	url := r.PostFormValue("message-url")
 
-	log.WithFields(log.Fields{
+	logger.WithFields(log.Fields{
 		"recipient": recipient,
 		"url":       url,
 	}).Info("got mail")
@@ -144,7 +146,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// if something fails during the card creation process `card` will be nil
 	// now upload attachments
-	log.WithFields(log.Fields{"quantity": len(message.Attachments)}).Info("uploading attachments")
+	logger.WithFields(log.Fields{"quantity": len(message.Attachments)}).Info("uploading attachments")
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
 	attachmentUrls := make(map[string]string)
@@ -154,13 +156,13 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			filedst := filepath.Join(dir, mailAttachment.Name)
 			err = helpers.DownloadFile(filedst, mailAttachment.Url, "api", settings.MailgunAPIKey)
 			if err != nil {
-				log.Warn("download of " + mailAttachment.Url + " failed: " + err.Error())
+				logger.Warn("download of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
 			trelloAttachment, err := card.UploadAttachment(filedst)
 			if err != nil {
-				log.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
+				logger.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
 				reportError(raygun, err)
 				continue
 			}
@@ -186,7 +188,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 				var ok bool
 				if newUrl, ok = attachmentUrls[oldUrl]; !ok {
 					// something is wrong here, continue
-					log.Warn("didn't found the newUrl for a cid attachment.")
+					logger.Warn("didn't found the newUrl for a cid attachment.")
 					continue
 				}
 				body = strings.Replace(body, "cid:"+cid, newUrl, -1)
@@ -223,7 +225,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
-	log.WithFields(log.Fields{"card": card.ShortLink}).Info("posting comment")
+	logger.WithFields(log.Fields{"card": card.ShortLink}).Info("posting comment")
 	prefix := fmt.Sprintf("[:envelope_with_arrow:](%s)", attachedBody.Url)
 	commentText := fmt.Sprintf("%s %s:\n\n> %s",
 		prefix,
@@ -238,7 +240,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	comment, err := card.AddComment(commentText)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"card": card.ShortLink,
 			"err":  err.Error(),
 		}).Error("couldn't post the comment")
@@ -257,7 +259,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		comment.Id,
 	)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"email":   helpers.MessageHeader(message, "Message-Id"),
 			"card":    card.ShortLink,
 			"comment": comment.Id,
@@ -272,7 +274,9 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
-	log.Info("a Trello webhook was created.")
+	if r.Method == "HEAD" {
+		log.Info("a Trello webhook was created.")
+	}
 	w.WriteHeader(200)
 }
 
@@ -283,7 +287,7 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	   find related email thread
 	   send email
 	*/
-
+	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	var wh struct {
@@ -306,12 +310,12 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 
 	switch wh.Action.Type {
 	case "deleteCard":
-		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
+		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.Id}).Info("webhook")
 		db.RemoveCard(wh.Action.Data.Card.Id)
 		w.WriteHeader(202)
 		return
 	case "updateComment":
-		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
+		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
 		text := wh.Action.Data.Action.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {
@@ -332,7 +336,7 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 			goto abort
 		}
 	case "commentCard":
-		log.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card}).Info("webhook")
+		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
 		text := wh.Action.Data.Text
 		strippedText = helpers.CommentStripPrefix(text)
 		if text == strippedText {
@@ -350,7 +354,7 @@ abort:
 sendMail:
 	params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
 	if err != nil {
-		log.Info("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
+		logger.Info("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
 		reportError(raygun, err)
 		sendJSONError(w, err, 404)
 		return
@@ -363,13 +367,13 @@ sendMail:
 	} else {
 		domain := strings.Split(params.OutboundAddr, "@")[1]
 		if domain != settings.BaseDomain {
-			log.Debug("trying the address ", sendingAddr, ", domain ", domain)
+			logger.Debug("trying the address ", sendingAddr, ", domain ", domain)
 			if !mailgun.DomainCanSend(domain) {
 				sendingAddr = params.InboundAddr
 			}
 		}
 	}
-	log.WithFields(log.Fields{
+	logger.WithFields(log.Fields{
 		"to":   params.Recipients,
 		"from": sendingAddr,
 	}).Info("sending email")

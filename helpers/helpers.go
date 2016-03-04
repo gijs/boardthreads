@@ -2,33 +2,35 @@ package helpers
 
 import (
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/websitesfortrello/mailgun-go"
 )
 
-func HTMLToMarkdown(html string) (md string, err error) {
-	command := exec.Command("./html2markdown")
-	stdin, err := command.StdinPipe()
-	stdin.Write([]byte(html))
-	mdBytes, err := command.Output()
-	return string(mdBytes), err
-}
+func HTMLToMarkdown(html string) string {
+	abspath, _ := filepath.Abs("./helpers/html2markdown")
+	command := exec.Command(abspath, html)
 
-func ParseEmailAddress(from string) string {
-	command := exec.Command("./parseEmailAddress")
-	stdin, err := command.StdinPipe()
-	stdin.Write([]byte(from))
-	addrBytes, err := command.Output()
+	output, err := command.CombinedOutput()
 	if err != nil {
-		log.Print("./parseEmailAddress failed with " + from)
-		return from
+		bound := len(html)
+		if bound > 200 {
+			bound = 200
+		}
+		log.WithFields(log.Fields{
+			"err":    err.Error(),
+			"html":   html[:bound],
+			"stderr": string(output),
+		}).Warn("couldn't convert html")
+		return ""
 	}
-	return string(addrBytes)
+
+	return string(output)
 }
 
 func ExtractSubject(subject string) string {

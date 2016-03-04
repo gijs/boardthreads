@@ -38,7 +38,6 @@ func main() {
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:      true,
 		DisableTimestamp: true,
-		DisableSorting:   true,
 	})
 
 	jwtMiddle := jwtmiddleware.New(jwtmiddleware.Options{

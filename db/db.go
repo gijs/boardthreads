@@ -150,8 +150,7 @@ RETURN
  last,
  (TIMESTAMP() - last > 1000*60*60*24*15) AS expired // expiration: 15 days
 LIMIT 1
-    `, messageId,
-		messageSubject, helpers.ExtractSubject(messageSubject), senderAddress)
+    `, messageId, messageSubject, helpers.ExtractSubject(messageSubject), senderAddress)
 
 	if err != nil {
 		// a real error

@@ -215,8 +215,8 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get markdown from message HTML
-	md, err := helpers.HTMLToMarkdown(message.StrippedHtml)
-	if err != nil || md == "" {
+	md := helpers.HTMLToMarkdown(message.StrippedHtml)
+	if md == "" {
 		if message.StrippedText != "" {
 			md = message.StrippedText
 		} else {

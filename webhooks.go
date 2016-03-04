@@ -274,9 +274,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "HEAD" {
-		log.Info("a Trello webhook was created.")
-	}
+	log.Info("a Trello webhook was created.")
 	w.WriteHeader(200)
 }
 

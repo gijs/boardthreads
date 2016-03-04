@@ -92,6 +92,10 @@ func main() {
 	router.Path("/webhooks/trello/{card}").Methods("POST").HandlerFunc(TrelloCardWebhook)
 	router.Path("/webhooks/segment/tracking").Methods("POST").HandlerFunc(SegmentTracking)
 
+	router.Path("/check").Methods("GET").HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	})
+
 	server := &graceful.Server{
 		Timeout: 2 * time.Second,
 		Server: &http.Server{

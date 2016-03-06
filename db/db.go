@@ -3,8 +3,9 @@ package db
 import (
 	"bt/helpers"
 	"errors"
-	"log"
+	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
 	_ "gopkg.in/cq.v1"
@@ -91,7 +92,7 @@ DELETE s, t, addr, c, h, card, m, mr, cmm
 	return
 }
 
-func SetupNewAddress(userId, boardShortLink, listId, address string) (ok bool, err error) {
+func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (ok bool, err error) {
 	err = DB.Get(&ok, `
 OPTIONAL MATCH (oldaddress:EmailAddress {address: {3}})
 OPTIONAL MATCH (oldaddress)-[t:TARGETS]->()
@@ -129,6 +130,61 @@ FOREACH (oldaddress IN CASE WHEN oldaddress IS NULL THEN [] ELSE [1] END |
 WITH CASE WHEN oldaddress IS NULL THEN true WHEN olduser.id = newuser.id THEN true ELSE false END as ok
 RETURN ok
 `, userId, boardShortLink, listId, address)
+	if err != nil || ok != true {
+		return
+	}
+
+	if outboundaddr == address || outboundaddr == "" {
+		return
+	}
+
+	var domainName string
+	outbound := strings.Split(outboundaddr, "@")
+	if len(outbound) == 2 {
+		domainName = outbound[1]
+	} else {
+		log.WithFields(log.Fields{
+			"address":      address,
+			"outboundaddr": outboundaddr,
+		}).Warn("outboundaddr being set is invalid")
+		return
+	}
+
+	// a second query just to set the outbound address
+	DB.Get(&ok, `
+MATCH (e:EmailAddress {address: {1}})
+OPTIONAL MATCH (e)-[s:SENDS_THROUGH]->()
+DELETE s
+  
+WITH e
+MERGE (d:Domain {host: {2}})
+MERGE (u:User {id: {0}})
+
+WITH d, u, e
+OPTIONAL MATCH (owner:User)-[:OWNS]->(d)
+
+// only perform the domain operation if it is new or the user controls it
+FOREACH (x IN CASE WHEN owner IS NULL THEN [1] WHEN owner.id = u.id THEN [1] ELSE [] END |
+  MERGE (o:EmailAddress {address: {3}})
+  
+  MERGE (u)-[:OWNS]->(d)
+  MERGE (d)-[:OWNS]->(o)
+  MERGE (o)<-[:SENDS_THROUGH]-(e)
+)
+// otherwise set this address to send through itself
+FOREACH (x IN CASE WHEN owner IS NOT NULL AND owner.id <> u.id THEN [1] ELSE [] END |
+  MERGE (e)-[:SENDS_THROUGH]->(e)
+)
+
+RETURN CASE WHEN owner IS NOT NULL AND owner.id <> u.id THEN false ELSE true END AS ok
+           `, userId, address, domainName, outboundaddr)
+	if err != nil || ok != true {
+		log.WithFields(log.Fields{
+			"address":      address,
+			"outboundaddr": outboundaddr,
+			"err":          err.Error(),
+		}).Warn("failed to set outboundaddr")
+	}
 	return
 }
 

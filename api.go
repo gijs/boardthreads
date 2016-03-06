@@ -186,7 +186,7 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// adding address to db
-	ok, err := db.SetupNewAddress(userId, board.ShortLink, data.ListId, data.InboundAddr)
+	ok, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.InboundAddr)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)

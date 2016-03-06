@@ -18,12 +18,17 @@ func TestDB(t *testing.T) {
 
 	g.Describe("db functions", func() {
 
-		g.It("should connect", func() {
+		g.It("should connect and delete everything", func() {
 			Expect(DB).ToNot(BeNil())
+			DB.Exec(`
+MATCH (n)
+OPTIONAL MATCH (n)-[r]-()
+DELETE n,r
+            `)
 		})
 
 		g.It("should set new address", func() {
-			Expect(SetupNewAddress("maria", "b36437", "l43834", "maria@boardthreads.com")).To(Equal(true))
+			Expect(SetAddress("maria", "b36437", "l43834", "maria@boardthreads.com", "maria@boardthreads.com")).To(Equal(true))
 		})
 
 		g.It("should get that address", func() {
@@ -37,7 +42,7 @@ func TestDB(t *testing.T) {
 		})
 
 		g.It("should change the target list", func() {
-			Expect(SetupNewAddress("maria", "b77837", "l49983", "maria@boardthreads.com")).To(Equal(true))
+			Expect(SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "maria@boardthreads.com")).To(Equal(true))
 
 			address := Address{
 				ListId:       "l49983",
@@ -45,6 +50,22 @@ func TestDB(t *testing.T) {
 				OutboundAddr: "maria@boardthreads.com",
 			}
 			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{address}))
+			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(address))
+		})
+
+		g.It("should change the outboundaddr", func() {
+			ok, err := SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "help@maria.com")
+			Expect(err).To(BeNil())
+			Expect(ok).To(Equal(true))
+
+			address := Address{
+				ListId:       "l49983",
+				InboundAddr:  "maria@boardthreads.com",
+				OutboundAddr: "help@maria.com",
+			}
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{address}))
+
+			address.DomainName = "maria.com" // GetAddress returns this, GetAddresses don't
 			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(address))
 		})
 	})

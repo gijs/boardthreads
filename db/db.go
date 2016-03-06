@@ -14,12 +14,13 @@ import (
 var DB *sqlx.DB
 
 type Settings struct {
-	Neo4jURL string `envconfig:"GRAPHSTORY_URL"`
+	Neo4jURL string `envconfig:"GRAPHSTORY_URL" default:"http://localhost:7474/"`
 }
+
+var settings Settings
 
 func init() {
 	var err error
-	var settings Settings
 	err = envconfig.Process("", &settings)
 	if err != nil {
 		log.Fatal(err.Error())

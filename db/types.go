@@ -1,19 +1,20 @@
 package db
 
-import "gopkg.in/cq.v1/types"
+import (
+	"bt/mailgun"
+
+	"gopkg.in/cq.v1/types"
+)
 
 type Address struct {
-	Start           types.NullTime `json:"start"                     db:"start"`
-	BoardShortLink  string         `json:"boardShortLink"            db:"boardShortLink"`
-	ListId          string         `json:"listId"                    db:"listId"`
-	InboundAddr     string         `json:"inboundaddr"               db:"inboundaddr"`
-	OutboundAddr    string         `json:"outboundaddr"              db:"outboundaddr"`
-	PaypalProfileId string         `json:"paypalProfileId,omitempty" db:"paypalProfileId"`
-	Domain          *Domain        `json:"domain"                    db:"domain"`
-}
-
-type Domain struct {
-	Domain string `json:"domain" db:"domain"`
+	Start           types.NullTime  `json:"start"                     db:"start"`
+	BoardShortLink  string          `json:"boardShortLink"            db:"boardShortLink"`
+	ListId          string          `json:"listId"                    db:"listId"`
+	InboundAddr     string          `json:"inboundaddr"               db:"inboundaddr"`
+	OutboundAddr    string          `json:"outboundaddr"              db:"outboundaddr"`
+	PaypalProfileId string          `json:"paypalProfileId,omitempty" db:"paypalProfileId"`
+	DomainName      string          `json:"-"                         db:"domain"`
+	DomainStatus    *mailgun.Domain `json:"domain,omitempty"`
 }
 
 type Email struct {

@@ -79,6 +79,8 @@ func main() {
 		Handler(jwtMiddle.Handler(http.HandlerFunc(GetAccount)))
 	router.Path("/api/account").Methods("PUT").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(SetAccount)))
+	router.Path("/api/addresses/{address}").Methods("GET").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(GetAddress)))
 	router.Path("/api/addresses/{address}").Methods("PUT").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(SetAddress)))
 	router.Path("/api/addresses/{address}").Methods("DELETE").

@@ -46,7 +46,7 @@ RETURN
  addr.date AS start,
  addr.address AS inboundaddr,
  CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
- d.host AS domain,
+ CASE WHEN d.host IS NOT NULL THEN d.host ELSE "" END AS domain,
  CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
 LIMIT 1
 `, emailAddress, userId)
@@ -66,6 +66,15 @@ RETURN
   CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
 ORDER BY start
     `, userId)
+	if err != nil {
+		if err.Error() != "sql: no rows in result set" {
+			// a real error
+			return addresses, err
+		} else {
+			// nothing found
+			return addresses, nil
+		}
+	}
 	return
 }
 
@@ -153,8 +162,8 @@ LIMIT 1
     `, messageId, messageSubject, helpers.ExtractSubject(messageSubject), senderAddress)
 
 	if err != nil {
-		// a real error
 		if err.Error() != "sql: no rows in result set" {
+			// a real error
 			return "", err
 		} else {
 			// nothing found

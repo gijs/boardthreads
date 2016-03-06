@@ -27,29 +27,6 @@ func init() {
 	Client = mailgun.NewMailgun(settings.Domain, settings.ApiKey, "")
 }
 
-func DomainCanSend(domain string) bool {
-	_, _, sending, err := Client.GetSingleDomain(domain)
-	if err != nil {
-		return false
-	}
-
-	var include bool
-	var domainkey bool
-	for _, dns := range sending {
-		if dns.Valid == "valid" && dns.RecordType == "TXT" {
-			if dns.Name == domain && strings.Contains(dns.Value, "include") {
-				include = true
-			} else if strings.HasSuffix(dns.Name, "domainkey."+domain) {
-				domainkey = true
-			}
-		}
-	}
-	if include && domainkey {
-		return true
-	}
-	return false
-}
-
 func Send(params NewMessage) (messageId string, err error) {
 	message := Client.NewMessage(params.From, params.Subject, params.Text, params.Recipients...)
 	if params.HTML != "" {
@@ -71,4 +48,51 @@ func Send(params NewMessage) (messageId string, err error) {
 		return "", err
 	}
 	return messageId, nil
+}
+
+func DomainCanSend(domain string) bool {
+	_, _, sending, err := Client.GetSingleDomain(domain)
+	if err != nil {
+		return false
+	}
+
+	sendingDNS := ExtractDNS(domain, sending)
+	return sendingDNS.Include.Valid && sendingDNS.Include.Valid
+}
+
+func GetDomain(name string) (*Domain, error) {
+	domain, _, sendingRecords, err := Client.GetSingleDomain(name)
+	if err != nil {
+		if strings.Contains(err.Error(), "got=404") {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	return &Domain{
+		Name:       domain.Name,
+		SendingDNS: ExtractDNS(name, sendingRecords),
+	}, nil
+}
+
+func ExtractDNS(domain string, records []mailgun.DNSRecord) SendingDNS {
+	s := SendingDNS{}
+	for _, dns := range records {
+		if dns.RecordType == "TXT" {
+			if dns.Name == domain && strings.Contains(dns.Value, "include") {
+				s.Include = DNSRecord{"TXT", dns.Name, dns.Value, isValid(dns.Valid)}
+			} else if strings.HasSuffix(dns.Name, "domainkey."+domain) {
+				s.DomainKey = DNSRecord{"TXT", dns.Name, dns.Value, isValid(dns.Valid)}
+			}
+		}
+	}
+	return s
+}
+
+func isValid(s string) bool {
+	if s == "valid" {
+		return true
+	}
+	return false
 }

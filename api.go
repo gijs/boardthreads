@@ -97,6 +97,47 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func GetAddress(w http.ResponseWriter, r *http.Request) {
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
+	/* address detailed information, includes domain status
+	 */
+
+	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
+	vars := mux.Vars(r)
+
+	// address data
+	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 404, logger)
+		return
+	}
+
+	// domain status
+	logger.Debug(address.InboundAddr, " ", address.OutboundAddr, " domain name: ", address.DomainName)
+	for {
+		if address.DomainName != "" {
+			domain, err := mailgun.GetDomain(address.DomainName)
+			if err != nil {
+				logger.WithFields(log.Fields{
+					"name": address.DomainName,
+					"err":  err.Error(),
+				}).Warn("failed to fetch domain from mailgun")
+				reportError(raygun, err, logger)
+				break
+			}
+
+			logger.Debug(domain.Name, " => ", domain.SendingDNS)
+			address.DomainStatus = domain
+		}
+		break
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(address)
+}
+
 func SetAccount(w http.ResponseWriter, r *http.Request) {
 }
 

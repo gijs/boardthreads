@@ -33,6 +33,23 @@ func HTMLToMarkdown(html string) string {
 	return string(output)
 }
 
+func ParseAddress(from string) string {
+	abspath, _ := filepath.Abs("./helpers/parseaddress")
+	command := exec.Command(abspath, from)
+
+	output, err := command.CombinedOutput()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":     err.Error(),
+			"address": from,
+			"stderr":  string(output),
+		}).Warn("couldn't parse address")
+		return from
+	}
+
+	return string(output)
+}
+
 func ExtractSubject(subject string) string {
 	subject = strings.Trim(subject, " ")
 	for i := 0; i < 3; i++ {
@@ -81,7 +98,7 @@ func ReplyToOrFrom(message mailgun.StoredMessage) string {
 	if replyto != "" {
 		return replyto
 	}
-	return message.From
+	return ParseAddress(message.From)
 }
 
 func MessageHeader(message mailgun.StoredMessage, header string) string {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bt/cache"
 	"bt/db"
 	"bt/helpers"
 	"bt/mailgun"
@@ -165,13 +166,20 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 				reportError(raygun, err, logger)
 				continue
 			}
-			trelloAttachment, err := card.UploadAttachment(filedst)
-			if err != nil {
-				logger.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
-				reportError(raygun, err, logger)
-				continue
+
+			// before uploading, check if file is already on this trello card
+			if cache.Has(card.Id, filedst) {
+				attachmentUrls[mailAttachment.Url] = cache.Url()
+			} else {
+				trelloAttachment, err := card.UploadAttachment(filedst)
+				if err != nil {
+					logger.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
+					reportError(raygun, err, logger)
+					continue
+				}
+				attachmentUrls[mailAttachment.Url] = trelloAttachment.Url
+				cache.Save(trelloAttachment.Url)
 			}
-			attachmentUrls[mailAttachment.Url] = trelloAttachment.Url
 		}
 	}
 

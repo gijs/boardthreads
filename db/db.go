@@ -193,7 +193,16 @@ func GetTargetListForEmailAddress(address string) (listId string, err error) {
 MATCH (:EmailAddress {address: {0}})-[:TARGETS]->(l:List)
 RETURN l.id AS listId
     `, address)
-	return
+	if err != nil {
+		if err.Error() != "sql: no rows in result set" {
+			// a real error
+			return "", err
+		} else {
+			// nothing found
+			return "", nil
+		}
+	}
+	return listId, nil
 }
 
 func GetCardForMessage(messageId, messageSubject, senderAddress, recipientAddress string) (string, error) {

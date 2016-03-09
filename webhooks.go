@@ -56,7 +56,18 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	// target list for this email
 	listId, err := db.GetTargetListForEmailAddress(recipient)
 	if err != nil {
-		logger.WithFields(log.Fields{"address": recipient}).Warn("no list registered for this address")
+		logger.WithFields(log.Fields{
+			"address": recipient,
+			"err":     err.Error(),
+		}).Warn("error fetching list with address")
+		sendJSONError(w, err, 500, logger)
+		return
+	}
+	if listId == "" {
+		logger.WithFields(log.Fields{
+			"address": recipient,
+			"err":     err.Error(),
+		}).Warn("no list registered for address")
 		sendJSONError(w, err, 406, logger)
 		return
 	}

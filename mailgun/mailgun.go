@@ -37,7 +37,7 @@ func Send(params NewMessage) (messageId string, err error) {
 		message.AddHeader("Reply-To", params.ReplyTo)
 		message.AddHeader("In-Reply-To", params.InReplyTo)
 		message.AddTag(params.From)
-		message.AddVariable("card", params.CardShortLink)
+		message.AddVariable("card", params.CardId)
 		message.AddVariable("commenter", params.CommenterId)
 		message.SetTrackingClicks(false)
 		message.SetTrackingOpens(false)

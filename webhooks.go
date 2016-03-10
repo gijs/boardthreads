@@ -24,7 +24,37 @@ import (
 	goTrello "github.com/websitesfortrello/go-trello"
 )
 
-func MailgunSuccess(w http.ResponseWriter, r *http.Request) {}
+func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+
+	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+
+	r.ParseForm()
+	cardId := strings.Trim(r.PostFormValue("card"), `"`)
+	commenterId := strings.Trim(r.PostFormValue("commenter"), `"`)
+
+	card, err := trello.Client.Card(cardId)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"card": cardId,
+			"err":  err.Error(),
+		}).Warn("couldn't fetch card after mail success")
+		reportError(raygun, err, logger)
+		return
+	}
+
+	card.AddMemberId(commenterId)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"card":    cardId,
+			"replier": commenterId,
+			"err":     err.Error(),
+		}).Warn("couldn't add replier to card.")
+		reportError(raygun, err, logger)
+	}
+}
+
 func MailgunFailure(w http.ResponseWriter, r *http.Request) {}
 
 func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
@@ -404,7 +434,7 @@ sendMail:
 		Subject:       helpers.ExtractSubject(params.LastMailSubject),
 		InReplyTo:     params.LastMailId,
 		ReplyTo:       params.InboundAddr,
-		CardShortLink: wh.Action.Data.Card.ShortLink,
+		CardId:        wh.Action.Data.Card.Id,
 		CommenterId:   wh.Action.MemberCreator.Id,
 	})
 	if err != nil {

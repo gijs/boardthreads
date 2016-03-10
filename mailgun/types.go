@@ -9,7 +9,7 @@ type NewMessage struct {
 	Subject       string
 	InReplyTo     string
 	ReplyTo       string
-	CardShortLink string
+	CardId        string
 	CommenterId   string
 }
 

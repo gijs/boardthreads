@@ -3,9 +3,12 @@ package trello
 import (
 	"bt/helpers"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/url"
+	"strings"
+
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/websitesfortrello/go-trello"
@@ -29,7 +32,7 @@ func init() {
 		log.Fatal(err.Error())
 	}
 
-	Client, err = trello.NewAuthClient(settings.ApiKey, &settings.BotToken)
+	Client, err = trello.NewAuthClient(settings.ApiKey, settings.BotToken)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -41,7 +44,7 @@ func init() {
 }
 
 func UserFromToken(token string) (member *trello.Member, err error) {
-	c, err := trello.NewAuthClient(settings.ApiKey, &token)
+	c, err := trello.NewAuthClient(settings.ApiKey, token)
 	if err != nil {
 		return
 	}
@@ -50,7 +53,7 @@ func UserFromToken(token string) (member *trello.Member, err error) {
 }
 
 func EnsureBot(token, listId string) (*trello.Board, error) {
-	c, err := trello.NewAuthClient(settings.ApiKey, &token)
+	c, err := trello.NewAuthClient(settings.ApiKey, token)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +70,13 @@ func EnsureBot(token, listId string) (*trello.Board, error) {
 
 	err = board.AddMemberId(settings.BotId, "normal")
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "401") {
+			// no add-member permissions
+			return nil, errors.New("no-permission")
+		} else {
+			// unknown error
+			return nil, err
+		}
 	}
 
 	return board, nil

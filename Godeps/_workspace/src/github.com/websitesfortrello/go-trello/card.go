@@ -325,3 +325,20 @@ func (c *Card) MoveToPos(pos int) (*Card, error) {
 	newCard.client = c.client
 	return newCard, nil
 }
+
+// AddMemberId will add a member to the card
+// https://developers.trello.com/advanced-reference/card#post-1-cards-card-id-or-shortlink-idmembers
+func (c *Card) AddMemberId(idMember string) error {
+	payload := url.Values{}
+	payload.Set("value", idMember)
+
+	_, err := c.client.Post("/cards/"+c.Id+"/idMembers", payload)
+	return err
+}
+
+// RemoveMemberId will remove a member from the card
+// https://developers.trello.com/advanced-reference/card#delete-1-cards-card-id-members-idmember
+func (c *Card) RemoveMemberId(idMember string) error {
+	_, err := c.client.Delete("/cards/" + c.Id + "/idMembers/" + idMember)
+	return err
+}

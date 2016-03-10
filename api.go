@@ -186,12 +186,20 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 
 	// fetch board and ensure bot is on the board
 	board, err := trello.EnsureBot(trelloToken, data.ListId)
-	if err != nil {
+	if err != nil && err.Error() == "no-permission" {
+		sendJSONError(w, err, 403, logger)
+		return
+	} else if err != nil {
 		logger.WithFields(log.Fields{
+			"err":     err.Error(),
 			"user":    userId,
+			"token":   trelloToken,
 			"address": data.InboundAddr,
 			"list":    data.ListId,
-		}).Info("couldn't fetch board or ensure the existence of the bot on the board")
+		}).Error("couldn't fetch board or ensure the existence of the bot on the board")
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 502, logger)
+		return
 	}
 
 	// adding address to db

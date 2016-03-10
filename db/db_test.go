@@ -27,6 +27,14 @@ DELETE n,r
             `)
 		})
 
+		g.It("should create a new user", func() {
+			Expect(EnsureUser("u47284")).To(Equal(true))
+		})
+
+		g.It("should just ensure a created user", func() {
+			Expect(EnsureUser("u47284")).To(Equal(false))
+		})
+
 		g.It("should set new address", func() {
 			Expect(SetAddress("maria", "b36437", "l43834", "maria@boardthreads.com", "maria@boardthreads.com")).To(Equal(true))
 		})
@@ -42,7 +50,7 @@ DELETE n,r
 		})
 
 		g.It("should change the target list", func() {
-			Expect(SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "maria@boardthreads.com")).To(Equal(true))
+			Expect(SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "maria@boardthreads.com")).To(Equal(false))
 
 			address := Address{
 				ListId:       "l49983",
@@ -54,9 +62,9 @@ DELETE n,r
 		})
 
 		g.It("should change the outboundaddr", func() {
-			ok, err := SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "help@maria.com")
+			new, err := SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "help@maria.com")
 			Expect(err).To(BeNil())
-			Expect(ok).To(Equal(true))
+			Expect(new).To(Equal(false))
 
 			address := Address{
 				ListId:       "l49983",

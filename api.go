@@ -202,7 +202,7 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// adding address to db
-	ok, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
+	new, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
@@ -214,7 +214,7 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		"list":    data.ListId,
 	}).Info("saved to db")
 
-	if !ok {
+	if new {
 		sendJSONError(w, err, 401, logger)
 		return
 	}

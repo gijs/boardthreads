@@ -30,12 +30,17 @@ func init() {
 	DB = sqlx.MustConnect("neo4j-cypher", settings.Neo4jURL)
 }
 
-func EnsureUser(id string) error {
-	_, err := DB.Exec("MERGE (u:User {id: {0}})", id)
+func EnsureUser(id string) (new bool, err error) {
+	err = DB.Get(&new, `
+OPTIONAL MATCH (ou:User {id: {0}})
+MERGE (nu:User {id: {0}})
+WITH CASE WHEN ou.id = nu.id THEN false ELSE true END AS new
+RETURN new
+    `, id)
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
 func GetAddress(userId, emailAddress string) (address Address, err error) {
@@ -92,8 +97,8 @@ DELETE s, t, addr, c, h, card, m, mr, cmm
 	return
 }
 
-func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (ok bool, err error) {
-	err = DB.Get(&ok, `
+func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (new bool, err error) {
+	err = DB.Get(&new, `
 OPTIONAL MATCH (oldaddress:EmailAddress {address: {3}})
 OPTIONAL MATCH (oldaddress)-[t:TARGETS]->()
 OPTIONAL MATCH (oldaddress)-[s:SENDS_THROUGH]->(oldsendingaddress)
@@ -127,10 +132,14 @@ FOREACH (oldaddress IN CASE WHEN oldaddress IS NULL THEN [] ELSE [1] END |
   // else do nothing
 )
 
-WITH CASE WHEN oldaddress IS NULL THEN true WHEN olduser.id = newuser.id THEN true ELSE false END as ok
-RETURN ok
+WITH CASE
+  WHEN oldaddress IS NULL THEN true
+  // WHEN olduser.id = newuser.id THEN true
+  ELSE false
+END as new
+RETURN new
 `, userId, boardShortLink, listId, address)
-	if err != nil || ok != true {
+	if err != nil {
 		return
 	}
 
@@ -151,6 +160,7 @@ RETURN ok
 	}
 
 	// a second query just to set the outbound address
+	var ok bool
 	DB.Get(&ok, `
 MATCH (e:EmailAddress {address: {1}})
 OPTIONAL MATCH (e)-[s:SENDS_THROUGH]->()

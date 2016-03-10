@@ -43,6 +43,14 @@ RETURN new
 	return
 }
 
+func GetUserForAddress(address string) (userId string, err error) {
+	err = DB.Get(&userId, `
+MATCH (u:User)-[:CONTROLS]->(:EmailAddress {address: {0}})
+RETURN u.id AS userId
+    `, address)
+	return
+}
+
 func GetAddress(userId, emailAddress string) (address Address, err error) {
 	err = DB.Get(&address, `
 MATCH (out)<-[s:SENDS_THROUGH]-(addr:EmailAddress {address: {0}})<-[c:CONTROLS]-()

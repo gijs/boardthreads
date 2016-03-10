@@ -53,6 +53,10 @@
 			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
 		},
 		{
+			"ImportPath": "github.com/jehiah/go-strftime",
+			"Rev": "2efbe75097a505e2789f7e39cb9da067b5be8e3e"
+		},
+		{
 			"ImportPath": "github.com/jmoiron/sqlx",
 			"Comment": "sqlx-v1.1",
 			"Rev": "69738bd209812c5a381786011aff17944a384554"
@@ -86,6 +90,15 @@
 			"ImportPath": "github.com/russross/blackfriday",
 			"Comment": "v1.4-21-g006144a",
 			"Rev": "006144af03eeeff1037240a71865a9fd61f1c25f"
+		},
+		{
+			"ImportPath": "github.com/segmentio/analytics-go",
+			"Comment": "2.1.0-1-ga3bcbc9",
+			"Rev": "a3bcbc9544d297bf807351cdd0487588dff4d378"
+		},
+		{
+			"ImportPath": "github.com/segmentio/backo-go",
+			"Rev": "ed3adc599ae5cd72e97bd085ff1835c9d3276594"
 		},
 		{
 			"ImportPath": "github.com/sergi/go-diff/diffmatchpatch",
@@ -127,6 +140,10 @@
 		{
 			"ImportPath": "github.com/websitesfortrello/mailgun-go",
 			"Rev": "17a28ae342c3dbd856729229e80cb29282fffe87"
+		},
+		{
+			"ImportPath": "github.com/xtgo/uuid",
+			"Rev": "a0b114877d4caeffbd7f87e3757c17fce570fea7"
 		},
 		{
 			"ImportPath": "golang.org/x/net/html",

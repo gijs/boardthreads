@@ -19,6 +19,7 @@ import (
 	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"github.com/segmentio/analytics-go"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 
 	goTrello "github.com/websitesfortrello/go-trello"
@@ -319,6 +320,18 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
+
+	// tracking
+	userId, _ := db.GetUserForAddress(recipient)
+	segment.Track(&analytics.Track{
+		Event:  "Received mail",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"card":    card.Id,
+			"from":    helpers.ReplyToOrFrom(message),
+			"address": recipient,
+		},
+	})
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +474,16 @@ sendMail:
 	}
 
 	w.WriteHeader(200)
-}
 
-func SegmentTracking(w http.ResponseWriter, r *http.Request) {}
+	// tracking
+	userId, _ := db.GetUserForAddress(params.InboundAddr)
+	segment.Track(&analytics.Track{
+		Event:  "Sent mail",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"card":    wh.Action.Data.Card.Id,
+			"to":      params.Recipients,
+			"address": params.InboundAddr,
+		},
+	})
+}

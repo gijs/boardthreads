@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/segmentio/analytics-go"
 
 	"bt/db"
 	"bt/mailgun"
@@ -46,7 +48,7 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	logger.WithFields(log.Fields{
 		"user": user.Id,
 	}).Info("fetching/saving user on db")
-	err = db.EnsureUser(user.Id)
+	new, err := db.EnsureUser(user.Id)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
@@ -71,6 +73,18 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"jwt": jwtString})
+
+	// tracking
+	if new {
+		segment.Identify(&analytics.Identify{
+			UserId: user.Id,
+			Traits: map[string]interface{}{
+				"username": user.Username,
+				"name":     user.FullName,
+				"avatar":   user.AvatarSource,
+			},
+		})
+	}
 }
 
 func GetAccount(w http.ResponseWriter, r *http.Request) {
@@ -214,13 +228,28 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		"list":    data.ListId,
 	}).Info("saved to db")
 
-	if new {
-		sendJSONError(w, err, 401, logger)
-		return
-	}
+	// returning response
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(db.Address{
+		InboundAddr:    data.InboundAddr,
+		OutboundAddr:   data.InboundAddr,
+		ListId:         data.ListId,
+		BoardShortLink: board.ShortLink,
+	})
 
-	// sending welcome message
-	/* mailgun.Send(mailgun.NewMessage{
+	// tracking
+	if new {
+		segment.Track(&analytics.Track{
+			Event:  "Created address",
+			UserId: userId,
+			Properties: map[string]interface{}{
+				"listId":  data.ListId,
+				"boardId": board.Id,
+				"address": data.InboundAddr,
+			},
+		})
+
+		mailgun.Send(mailgun.NewMessage{
 			ApplyMetadata: false,
 			Text: fmt.Sprintf(`
 	Hello and welcome to BoardThreads. This is a test message with the sole purpose of showing you how emails sent to %s will appear to you. If you need any help or have anything to say to us, you can reply here.
@@ -230,16 +259,8 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 			Recipients: []string{data.InboundAddr},
 			From:       "welcome@boardthreads.com",
 			Subject:    "Welcome to BoardThreads",
-		}) */
-
-	// returning response
-	w.Header().Add("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(db.Address{
-		InboundAddr:    data.InboundAddr,
-		OutboundAddr:   data.InboundAddr,
-		ListId:         data.ListId,
-		BoardShortLink: board.ShortLink,
-	})
+		})
+	}
 }
 
 func DeleteAddress(w http.ResponseWriter, r *http.Request) {
@@ -273,4 +294,13 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
+
+	// tracking
+	segment.Track(&analytics.Track{
+		Event:  "Deleted address",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"address": vars["address"] + "@" + settings.BaseDomain,
+		},
+	})
 }

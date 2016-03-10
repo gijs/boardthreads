@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/cors"
+	"github.com/segmentio/analytics-go"
 	"gopkg.in/tylerb/graceful.v1"
 )
 
@@ -27,12 +28,16 @@ type Settings struct {
 	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
 	MailgunAPIKey  string `envconfig:"MAILGUN_API_KEY"`
 	TrelloBotId    string `envconfig:"TRELLO_BOT_ID"`
+	SegmentioKey   string `envconfig:"SEGMENTIO_WRITE_KEY"`
 }
 
 var settings Settings
+var segment *analytics.Client
 
 func main() {
 	envconfig.Process("", &settings)
+
+	segment = analytics.New(settings.SegmentioKey)
 
 	log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
@@ -92,7 +97,6 @@ func main() {
 	router.Path("/webhooks/trello/card").Methods("HEAD", "GET").HandlerFunc(TrelloCardWebhookCreation)
 	router.Path("/webhooks/trello/card").Methods("POST").HandlerFunc(TrelloCardWebhook)
 	router.Path("/webhooks/trello/{card}").Methods("POST").HandlerFunc(TrelloCardWebhook)
-	router.Path("/webhooks/segment/tracking").Methods("POST").HandlerFunc(SegmentTracking)
 
 	router.Path("/check").Methods("GET").HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)

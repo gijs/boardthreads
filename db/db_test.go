@@ -76,5 +76,9 @@ DELETE n,r
 			address.DomainName = "maria.com" // GetAddress returns this, GetAddresses don't
 			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(address))
 		})
+
+		g.It("should get the owner of an address", func() {
+			Expect(GetUserForAddress("maria@boardthreads.com")).To(Equal("maria"))
+		})
 	})
 }

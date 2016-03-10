@@ -121,8 +121,8 @@
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/go-trello",
-			"Comment": "v0.1-34-g6675d4a",
-			"Rev": "6675d4a0af273e000ae56b1d17c32dbd6afed911"
+			"Comment": "v0.1-35-g69dbd94",
+			"Rev": "69dbd94d30ffcc2ad802fc7c0728fe3b9537da7b"
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/mailgun-go",

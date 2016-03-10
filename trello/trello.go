@@ -49,6 +49,30 @@ func UserFromToken(token string) (member *trello.Member, err error) {
 	return
 }
 
+func EnsureBot(token, listId string) (*trello.Board, error) {
+	c, err := trello.NewAuthClient(settings.ApiKey, &token)
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := c.List(listId)
+	if err != nil {
+		return nil, err
+	}
+
+	board, err := c.Board(list.IdBoard)
+	if err != nil {
+		return nil, err
+	}
+
+	err = board.AddMemberId(settings.BotId, "normal")
+	if err != nil {
+		return nil, err
+	}
+
+	return board, nil
+}
+
 func ReviveCard(card *trello.Card) (err error) {
 	_, err = card.SendToBoard()
 	if err != nil {

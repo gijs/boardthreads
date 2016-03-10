@@ -57,6 +57,7 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	// send the jwt token for this user
 	token := jwt.New(jwt.SigningMethodHS256)
 	token.Claims["id"] = user.Id
+	token.Claims["token"] = data.TrelloToken
 	token.Claims["iat"] = time.Now().Unix()
 	token.Claims["exp"] = time.Now().Add(time.Second * 3600 * 24 * 365).Unix()
 	jwtString, err := token.SignedString([]byte(settings.SessionSecret))
@@ -89,6 +90,11 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
+	}
+
+	// making sure addresses is not nil
+	if addresses == nil {
+		addresses = make([]db.Address, 0)
 	}
 
 	w.Header().Add("Content-Type", "application/json")
@@ -150,11 +156,13 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		   send welcome message
 		   create failure and success labels */
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
+	trelloToken := context.Get(r, "user").(*jwt.Token).Claims["token"].(string)
 	vars := mux.Vars(r)
 
 	data := struct {
-		ListId      string `json:"listId"`
-		InboundAddr string `json:"inboundAddr"`
+		ListId       string `json:"listId"`
+		InboundAddr  string `json:"inboundAddr"`
+		OutboundAddr string `json:"outboundAddr"`
 	}{
 		InboundAddr: vars["address"] + "@" + settings.BaseDomain,
 	}
@@ -165,28 +173,29 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// outboundaddr defaults to inboundaddr
+	if data.OutboundAddr == "" {
+		data.OutboundAddr = data.InboundAddr
+	}
+
 	logger.WithFields(log.Fields{
 		"user":    userId,
 		"address": data.InboundAddr,
 		"list":    data.ListId,
 	}).Info("creating address")
 
-	// fetch board
-	list, err := trello.Client.List(data.ListId)
+	// fetch board and ensure bot is on the board
+	board, err := trello.EnsureBot(trelloToken, data.ListId)
 	if err != nil {
-		reportError(raygun, err, logger)
-		sendJSONError(w, err, 400, logger)
-		return
-	}
-	board, err := trello.Client.Board(list.IdBoard)
-	if err != nil {
-		reportError(raygun, err, logger)
-		sendJSONError(w, err, 403, logger)
-		return
+		logger.WithFields(log.Fields{
+			"user":    userId,
+			"address": data.InboundAddr,
+			"list":    data.ListId,
+		}).Info("couldn't fetch board or ensure the existence of the bot on the board")
 	}
 
 	// adding address to db
-	ok, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.InboundAddr)
+	ok, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)

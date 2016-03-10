@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+
+var Paypal = require('paypal-recurring2')
+var getStdin = require('get-stdin')
+
+var paypal = new Paypal({
+  username: settings.PAYPAL_API_NAME,
+  password: settings.PAYPAL_API_PASSWORD,
+  signature: settings.PAYPAL_API_SIGNATURE
+})
+
+getStdin().then(function (stdin) {
+  var arg = JSON.parse(stdin)
+
+  paypal.authenticate(arg, function (err, data, url) {
+    if (err) {
+      throw err
+    }
+    process.stdout.write(url)
+  })
+})

@@ -16,7 +16,10 @@ limitations under the License.
 
 package trello
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"net/url"
+)
 
 type Board struct {
 	client   *Client
@@ -166,6 +169,24 @@ func (b *Board) MemberCards(IdMember string) (cards []Card, err error) {
 		cards[i].client = b.client
 	}
 	return
+}
+
+// AddMemberId will add a member to the board
+// `role` can be "normal", "admin" or "observer"
+// https://developers.trello.com/advanced-reference/board#put-1-boards-board-id-members-idmember
+func (b *Board) AddMemberId(idMember string, role string) error {
+	payload := url.Values{}
+	payload.Set("type", role)
+
+	_, err := b.client.Put("/boards/"+b.Id+"/members/"+idMember, payload)
+	return err
+}
+
+// RemoveMemberId will remove a member from the board
+// https://developers.trello.com/advanced-reference/board#delete-1-boards-board-id-members-idmember
+func (b *Board) RemoveMemberId(idMember string) error {
+	_, err := b.client.Delete("/boards/" + b.Id + "/members/" + idMember)
+	return err
 }
 
 func (b *Board) Actions(arg ...*Argument) (actions []Action, err error) {

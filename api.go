@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -221,17 +220,17 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// sending welcome message
-	mailgun.Send(mailgun.NewMessage{
-		ApplyMetadata: false,
-		Text: fmt.Sprintf(`
-Hello and welcome to BoardThreads. This is a test message with the sole purpose of showing you how emails sent to %s will appear to you. If you need any help or have anything to say to us, you can reply here.
+	/* mailgun.Send(mailgun.NewMessage{
+			ApplyMetadata: false,
+			Text: fmt.Sprintf(`
+	Hello and welcome to BoardThreads. This is a test message with the sole purpose of showing you how emails sent to %s will appear to you. If you need any help or have anything to say to us, you can reply here.
 
-Remember: to send replies you can just write a normal comment, only prefixed with :email: or :e-mail:, any other comments will stay as comments.
-        `, data.InboundAddr),
-		Recipients: []string{data.InboundAddr},
-		From:       "welcome@boardthreads.com",
-		Subject:    "Welcome to BoardThreads",
-	})
+	Remember: to send replies you can just write a normal comment, only prefixed with :email: or :e-mail:, any other comments will stay as comments.
+	        `, data.InboundAddr),
+			Recipients: []string{data.InboundAddr},
+			From:       "welcome@boardthreads.com",
+			Subject:    "Welcome to BoardThreads",
+		}) */
 
 	// returning response
 	w.Header().Add("Content-Type", "application/json")

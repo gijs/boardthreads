@@ -6,6 +6,7 @@ import (
 	"bt/helpers"
 	"bt/mailgun"
 	"bt/trello"
+	"errors"
 
 	"encoding/json"
 	"fmt"
@@ -93,7 +94,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 	if listId == "" {
 		logger.Warn("no list registered for address " + recipient)
-		sendJSONError(w, err, 406, logger)
+		sendJSONError(w, errors.New("no list registered for address."), 406, logger)
 		return
 	}
 

@@ -108,7 +108,6 @@ func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *
 
 to: %s
 from: %s
-sender: %s
 reply-to: %s
 subject: %s
 
@@ -116,7 +115,6 @@ subject: %s
             `,
 			message.Recipients,
 			message.From,
-			message.Sender,
 			helpers.ReplyToOrFrom(message),
 			message.Subject,
 		),

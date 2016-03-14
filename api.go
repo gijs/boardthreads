@@ -250,7 +250,7 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// release the old domain if we can
-	if oldAddress.DomainName != "" {
+	if oldAddress != nil && oldAddress.DomainName != "" {
 		err = db.MaybeReleaseDomainFromOwner(oldAddress.DomainName)
 		if err != nil {
 			logger.WithFields(log.Fields{

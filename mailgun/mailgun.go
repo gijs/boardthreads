@@ -73,11 +73,16 @@ func PrepareExternalAddress(inbound, outbound string) (routeId string, err error
 
 	err = Client.CreateDomain(domain, settings.Secret, "Delete", false)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err":    err.Error(),
-			"domain": domain,
-		}).Warn("failed to add domain to mailgun")
-		return
+		// verify if the domain isn't already there
+		_, _, _, err = Client.GetSingleDomain(domain)
+		if err != nil {
+			// no, so it is a real problem
+			log.WithFields(log.Fields{
+				"err":    err.Error(),
+				"domain": domain,
+			}).Warn("failed to add domain to mailgun")
+			return
+		}
 	}
 
 	route, err := Client.CreateRoute(mailgun.Route{

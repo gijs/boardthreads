@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"gopkg.in/validator.v2"
+
 	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
@@ -111,7 +113,7 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Account{
+	json.NewEncoder(w).Encode(db.Account{
 		Addresses: addresses,
 	})
 }
@@ -119,8 +121,9 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 func GetAddress(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
-	/* address detailed information, includes domain status
-	 */
+	/*
+	   address detailed information, includes domain status
+	*/
 
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
 	vars := mux.Vars(r)
@@ -132,26 +135,7 @@ func GetAddress(w http.ResponseWriter, r *http.Request) {
 		sendJSONError(w, err, 404, logger)
 		return
 	}
-
-	// domain status
-	logger.Debug(address.InboundAddr, " ", address.OutboundAddr, " domain name: ", address.DomainName)
-	for {
-		if address.DomainName != "" {
-			domain, err := mailgun.GetDomain(address.DomainName)
-			if err != nil {
-				logger.WithFields(log.Fields{
-					"name": address.DomainName,
-					"err":  err.Error(),
-				}).Warn("failed to fetch domain from mailgun")
-				reportError(raygun, err, logger)
-				break
-			}
-
-			logger.Debug(domain.Name, " => ", domain.SendingDNS)
-			address.DomainStatus = domain
-		}
-		break
-	}
+	MaybeFillDomainInformation(address)
 
 	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(address)
@@ -166,16 +150,15 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	/* accepts only an email address as parameter
 	       add address to db
 		   add bot to board
-		   send welcome message
-		   create failure and success labels */
+		   send welcome message */
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
 	trelloToken := context.Get(r, "user").(*jwt.Token).Claims["token"].(string)
 	vars := mux.Vars(r)
 
 	data := struct {
 		ListId       string `json:"listId"`
-		InboundAddr  string `json:"inboundAddr"`
-		OutboundAddr string `json:"outboundAddr"`
+		InboundAddr  string `json:"inboundAddr"  validate:"email"`
+		OutboundAddr string `json:"outboundAddr" validate:"email"`
 	}{
 		InboundAddr: vars["address"] + "@" + settings.BaseDomain,
 	}
@@ -191,10 +174,21 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		data.OutboundAddr = data.InboundAddr
 	}
 
+	// validation
+	if err := validator.Validate(data); err != nil {
+		log.WithFields(log.Fields{
+			"data": data,
+			"err":  err.Error(),
+		}).Error("validation error")
+		sendJSONError(w, err, 400, logger)
+		return
+	}
+
 	logger.WithFields(log.Fields{
-		"user":    userId,
-		"address": data.InboundAddr,
-		"list":    data.ListId,
+		"user":         userId,
+		"address":      data.InboundAddr,
+		"outboundaddr": data.OutboundAddr,
+		"list":         data.ListId,
 	}).Info("creating address")
 
 	// fetch board and ensure bot is on the board
@@ -215,8 +209,14 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// first remove old domains and routes
+	oldAddress, err := db.GetAddress(userId, data.InboundAddr)
+	if err == nil {
+		MaybeDeleteDomainAndRouteFlow(oldAddress, data.OutboundAddr)
+	}
+
 	// adding address to db
-	new, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
+	new, actualOutbound, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
@@ -224,18 +224,54 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.WithFields(log.Fields{
-		"address": data.InboundAddr,
-		"list":    data.ListId,
+		"address":      data.InboundAddr,
+		"outboundaddr": data.OutboundAddr,
+		"list":         data.ListId,
 	}).Info("saved to db")
 
-	// returning response
+	// create domain on mailgun (here we use the actual outboundaddr)
+	if data.InboundAddr != actualOutbound && isEmail(actualOutbound) {
+		logger.Debug("will create domain and route on mailgun")
+		routeId, err := mailgun.PrepareExternalAddress(data.InboundAddr, actualOutbound)
+		if err == nil && routeId != "" {
+			err = db.SaveRouteId(data.OutboundAddr, routeId)
+			if err != nil {
+				reportError(raygun, err, logger)
+			}
+		} else {
+			// if the domain could not be added to mailgun, set outboundaddr to inboundaddr
+			_, _, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.InboundAddr)
+			if err != nil {
+				reportError(raygun, err, logger)
+				sendJSONError(w, err, 500, logger)
+				return
+			}
+		}
+	}
+
+	// release the old domain if we can
+	if oldAddress.DomainName != "" {
+		err = db.MaybeReleaseDomainFromOwner(oldAddress.DomainName)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"domain": oldAddress.DomainName,
+				"err":    err.Error(),
+			}).Warn("failed to release domain")
+		}
+	}
+
+	// returning the address as response
+	// address data
+	newAddress, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 404, logger)
+		return
+	}
+	MaybeFillDomainInformation(newAddress)
+
 	w.Header().Add("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(db.Address{
-		InboundAddr:    data.InboundAddr,
-		OutboundAddr:   data.InboundAddr,
-		ListId:         data.ListId,
-		BoardShortLink: board.ShortLink,
-	})
+	json.NewEncoder(w).Encode(newAddress)
 
 	// tracking
 	if new {
@@ -286,11 +322,26 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// remove old domains and routes
+	MaybeDeleteDomainAndRouteFlow(address, "")
+
+	// actually delete
 	err = address.Delete()
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
+	}
+
+	// release domain if we can
+	if address.DomainName != "" {
+		err = db.MaybeReleaseDomainFromOwner(address.DomainName)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"domain": address.DomainName,
+				"err":    err.Error(),
+			}).Warn("failed to release domain")
+		}
 	}
 
 	w.WriteHeader(200)

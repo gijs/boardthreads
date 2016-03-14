@@ -2,17 +2,26 @@
 (:Board {shortLink})
 (:List {id})
 (:Card {shortLink, id, webhookId})
-(:EmailAddress {address, date})
-(:Domain {domain})
+(:EmailAddress:External {
+  address,
+  date,
+  replyTo, /* when there's an address somewhere that redirects to inboundaddr, this
+              can be set for plastic reasons. disabled when MX records are set */
+  senderName, /* also for plastic reasons, the "Name" in "Name <address@email.com>" */
+})
+(:Domain {host})
 (:Mail {id, date, subject, from, commentId})
 
 (:Board)-[:MEMBER {admin}]->(:User)
 (:Board)-[:CONTAINS]->(:List)
 (:User)-[:CONTROLS {paypalProfileId}]->(:EmailAddress)
 (:EmailAddress)-[:TARGETS]->(:List)
-(:EmailAddress)-[:SENDS_THROUGH]->(:EmailAddress)
+(:EmailAddress)-[:SENDS_THROUGH {
+  routeId /* SENDS_THROUGH also means there's a reverse route on mailgun redirecting
+             email from the external address to the inboundaddr, this is the routeId */
+}]->(:EmailAddress)
 (:User)-[:COMMENTED]->(:Mail)
-(:User)-[:OWNS]->(:DOMAIN)
+(:User)-[:OWNS]->(:Domain)
 (:Domain)-[:OWNS]->(:EmailAddress)
 (:Card)-[:LINKED_TO]->(:EmailAddress)
 (:Card)-[:CONTAINS]->(:Mail)

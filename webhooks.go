@@ -414,7 +414,10 @@ abort:
 sendMail:
 	params, err := db.GetEmailParamsForCard(wh.Action.Data.Card.ShortLink)
 	if err != nil {
-		logger.Info("no card found in our database for this comment reply. we will ignore it and cancel the webhook.")
+		logger.WithFields(log.Fields{
+			"card": wh.Action.Data.Card.ShortLink,
+			"text": strippedText,
+		}).Warn("no card found in our database for this comment. will ignore it and cancel the webhook.")
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 404, logger)
 		return
@@ -427,9 +430,13 @@ sendMail:
 	} else {
 		domain := strings.Split(params.OutboundAddr, "@")[1]
 		if domain != settings.BaseDomain {
-			logger.Debug("trying the address ", sendingAddr, ", domain ", domain)
-			if !mailgun.DomainCanSend(domain) {
+			// logger.Debug("trying the address ", sendingAddr, ", domain ", domain)
+			canSend, canReceive := mailgun.DomainCanSendReceive(domain)
+			if !canSend {
 				sendingAddr = params.InboundAddr
+			}
+			if canReceive {
+				params.ReplyTo = params.OutboundAddr
 			}
 		}
 	}
@@ -437,6 +444,11 @@ sendMail:
 		"to":   params.Recipients,
 		"from": sendingAddr,
 	}).Info("sending email")
+
+	// the default, safe replyTo address
+	if params.ReplyTo == "" || !isEmail(params.ReplyTo) {
+		params.ReplyTo = params.InboundAddr
+	}
 
 	// actually send
 	messageId, err := mailgun.Send(mailgun.NewMessage{
@@ -447,7 +459,7 @@ sendMail:
 		From:          sendingAddr,
 		Subject:       helpers.ExtractSubject(params.LastMailSubject),
 		InReplyTo:     params.LastMailId,
-		ReplyTo:       params.InboundAddr,
+		ReplyTo:       params.ReplyTo,
 		CardId:        wh.Action.Data.Card.Id,
 		CommenterId:   wh.Action.MemberCreator.Id,
 	})

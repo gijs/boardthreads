@@ -38,6 +38,7 @@ func main() {
 	envconfig.Process("", &settings)
 
 	segment = analytics.New(settings.SegmentioKey)
+	setValidators()
 
 	log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{

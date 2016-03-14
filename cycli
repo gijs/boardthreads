@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from urllib.parse import urlparse
-import os
+import os, sys
 
 u = urlparse(os.environ['GRAPHSTORY_URL'])
 

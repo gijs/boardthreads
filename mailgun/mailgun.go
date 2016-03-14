@@ -1,9 +1,9 @@
 package mailgun
 
 import (
-	"log"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/kelseyhightower/envconfig"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 	"github.com/websitesfortrello/mailgun-go"
@@ -12,13 +12,14 @@ import (
 type Settings struct {
 	ApiKey string `envconfig:"MAILGUN_API_KEY"`
 	Domain string `envconfig:"BASE_DOMAIN"`
+	Secret string `envconfig:"SESSION_SECRET"`
 }
 
 var Client mailgun.Mailgun
+var settings Settings
 
 func init() {
 	var err error
-	var settings Settings
 	err = envconfig.Process("", &settings)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -50,44 +51,82 @@ func Send(params NewMessage) (messageId string, err error) {
 	return messageId, nil
 }
 
-func DomainCanSend(domain string) bool {
-	_, _, sending, err := Client.GetSingleDomain(domain)
+func DomainCanSendReceive(domain string) (canSend bool, canReceive bool) {
+	_, receivingRecords, sendingRecords, err := Client.GetSingleDomain(domain)
 	if err != nil {
-		return false
+		return false, false
 	}
 
-	sendingDNS := ExtractDNS(domain, sending)
-	return sendingDNS.Include.Valid && sendingDNS.Include.Valid
+	DNS := ExtractDNS(domain, append(sendingRecords, receivingRecords...))
+	canSend = DNS.Include.Valid && DNS.Include.Valid
+
+	if DNS.Receive != nil && len(DNS.Receive) == 2 {
+		canReceive = DNS.Receive[0].Valid && DNS.Receive[1].Valid
+	}
+
+	return
+}
+
+func PrepareExternalAddress(inbound, outbound string) (routeId string, err error) {
+	// outbound must be previously verified to be a valid email address
+	domain := strings.Split(outbound, "@")[1]
+
+	err = Client.CreateDomain(domain, settings.Secret, "Delete", false)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":    err.Error(),
+			"domain": domain,
+		}).Warn("failed to add domain to mailgun")
+		return
+	}
+
+	route, err := Client.CreateRoute(mailgun.Route{
+		Priority:    64,
+		Description: "External inbound address.",
+		Expression:  `match_recipient("` + outbound + `")`,
+		Actions:     []string{`forward("` + inbound + `")`, "stop()"},
+	})
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":   err.Error(),
+			"route": `match_recipient("` + outbound + `")`,
+		}).Warn("failed to add route to mailgun")
+		return
+	}
+
+	return route.ID, nil
 }
 
 func GetDomain(name string) (*Domain, error) {
-	domain, _, sendingRecords, err := Client.GetSingleDomain(name)
+	domain, receivingRecords, sendingRecords, err := Client.GetSingleDomain(name)
 	if err != nil {
-		if strings.Contains(err.Error(), "got=404") {
-			return nil, nil
+		if strings.Contains(err.Error(), "Got=404") {
+			return &Domain{Name: name}, nil
 		} else {
 			return nil, err
 		}
 	}
 
 	return &Domain{
-		Name:       domain.Name,
-		SendingDNS: ExtractDNS(name, sendingRecords),
+		Name: domain.Name,
+		DNS:  ExtractDNS(name, append(sendingRecords, receivingRecords...)),
 	}, nil
 }
 
-func ExtractDNS(domain string, records []mailgun.DNSRecord) SendingDNS {
-	s := SendingDNS{}
+func ExtractDNS(domain string, records []mailgun.DNSRecord) *DNS {
+	s := DNS{}
 	for _, dns := range records {
 		if dns.RecordType == "TXT" {
 			if dns.Name == domain && strings.Contains(dns.Value, "include") {
-				s.Include = DNSRecord{"TXT", dns.Name, dns.Value, isValid(dns.Valid)}
+				s.Include = DNSRecord{"TXT", dns.Name, dns.Value, "", isValid(dns.Valid)}
 			} else if strings.HasSuffix(dns.Name, "domainkey."+domain) {
-				s.DomainKey = DNSRecord{"TXT", dns.Name, dns.Value, isValid(dns.Valid)}
+				s.DomainKey = DNSRecord{"TXT", dns.Name, dns.Value, "", isValid(dns.Valid)}
 			}
+		} else if dns.RecordType == "MX" {
+			s.Receive = append(s.Receive, DNSRecord{"MX", "", dns.Value, dns.Priority, isValid(dns.Valid)})
 		}
 	}
-	return s
+	return &s
 }
 
 func isValid(s string) bool {

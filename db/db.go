@@ -15,7 +15,8 @@ import (
 var DB *sqlx.DB
 
 type Settings struct {
-	Neo4jURL string `envconfig:"GRAPHSTORY_URL" default:"http://localhost:7474/"`
+	Neo4jURL   string `envconfig:"GRAPHSTORY_URL" default:"http://localhost:7474/"`
+	BaseDomain string `envconfig:"BASE_DOMAIN"    default:"boardthreads.com"`
 }
 
 var settings Settings
@@ -51,21 +52,33 @@ RETURN u.id AS userId
 	return
 }
 
-func GetAddress(userId, emailAddress string) (address Address, err error) {
-	err = DB.Get(&address, `
+func GetAddress(userId, emailAddress string) (*Address, error) {
+	address := Address{}
+	err := DB.Get(&address, `
 MATCH (out)<-[s:SENDS_THROUGH]-(addr:EmailAddress {address: {0}})<-[c:CONTROLS]-()
 MATCH (addr)-[t:TARGETS]->(l:List)
+OPTIONAL MATCH (addr)-[sends:SENDS_THROUGH]->(o) WHERE o.address <> addr.address
 OPTIONAL MATCH (out)<-[:OWNS]-(d:Domain)<-[:OWNS]-(:User {id: {1}})
 RETURN
- l.id AS listId,
- addr.date AS start,
- addr.address AS inboundaddr,
- CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
- CASE WHEN d.host IS NOT NULL THEN d.host ELSE "" END AS domain,
- CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
+  l.id AS listId,
+  addr.date AS start,
+  addr.address AS inboundaddr,
+  CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
+  CASE WHEN d.host IS NOT NULL THEN d.host ELSE "" END AS domain,
+  CASE WHEN sends.routeId IS NOT NULL THEN sends.routeId ELSE "" END AS routeId,
+  CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
 LIMIT 1
 `, emailAddress, userId)
-	return
+	if err != nil {
+		if err.Error() != "sql: no rows in result set" {
+			// a real error
+			return nil, err
+		} else {
+			// nothing found
+			return nil, nil
+		}
+	}
+	return &address, nil
 }
 
 func GetAddresses(userId string) (addresses []Address, err error) {
@@ -105,7 +118,7 @@ DELETE s, t, addr, c, h, card, m, mr, cmm
 	return
 }
 
-func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (new bool, err error) {
+func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (new bool, actualOutbound string, err error) {
 	err = DB.Get(&new, `
 OPTIONAL MATCH (oldaddress:EmailAddress {address: {3}})
 OPTIONAL MATCH (oldaddress)-[t:TARGETS]->()
@@ -151,15 +164,20 @@ RETURN new
 		return
 	}
 
-	if outboundaddr == address || outboundaddr == "" {
+	// we assume the function will be able to set the outboundaddr as specified
+	actualOutbound = outboundaddr
+
+	if new && outboundaddr == address {
 		return
 	}
 
 	var domainName string
 	outbound := strings.Split(outboundaddr, "@")
-	if len(outbound) == 2 {
+	if len(outbound) == 2 && (domainName != settings.BaseDomain || outboundaddr == address) {
 		domainName = outbound[1]
+		log.WithFields(log.Fields{"domain": domainName}).Debug("will set domain")
 	} else {
+		actualOutbound = address
 		log.WithFields(log.Fields{
 			"address":      address,
 			"outboundaddr": outboundaddr,
@@ -167,43 +185,103 @@ RETURN new
 		return
 	}
 
-	// a second query just to set the outbound address
-	var ok bool
-	DB.Get(&ok, `
+	// other queries just to set the outbound address
+	var authorized bool
+	if domainName == settings.BaseDomain {
+		authorized = false
+	} else {
+		err = DB.Get(&authorized, `
+OPTIONAL MATCH (d:Domain {host: {1}})
+OPTIONAL MATCH (owner:User)-[ownership:OWNS]->(d)
+
+RETURN CASE
+  WHEN owner.id = {0} THEN true
+  WHEN d IS NULL THEN true
+  WHEN ownership IS NULL THEN true
+  ELSE false
+END AS authorized
+    `, userId, domainName)
+		if err != nil {
+			authorized = false
+		}
+	}
+
+	if !authorized {
+		actualOutbound = address
+		_, err = DB.Exec(`
+MATCH (e:EmailAddress {address: {0}})
+OPTIONAL MATCH (e)-[sends:SENDS_THROUGH]->()
+OPTIONAL MATCH (e)-[:SENDS_THROUGH]->(:External)<-[ec:CONTROLS]-()
+DELETE sends, ec
+
+WITH e
+MERGE (e)-[:SENDS_THROUGH]->(e)
+    `, address)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"inboundaddr": address,
+				"err":         err.Error(),
+			}).Warn("failed to sent SENDS_THROUGH to inboundaddr")
+		}
+	} else {
+		_, err = DB.Exec(`
 MATCH (e:EmailAddress {address: {1}})
-OPTIONAL MATCH (e)-[s:SENDS_THROUGH]->()
-DELETE s
+OPTIONAL MATCH (e)-[sends:SENDS_THROUGH]->()
+OPTIONAL MATCH (e)-[:SENDS_THROUGH]->(:External)<-[ec:CONTROLS]-()
+DELETE sends, ec
   
 WITH e
-MERGE (d:Domain {host: {2}})
 MERGE (u:User {id: {0}})
 
-WITH d, u, e
-OPTIONAL MATCH (owner:User)-[:OWNS]->(d)
+MERGE (d:Domain {host: {2}})
+MERGE (o:EmailAddress:External {address: {3}})
 
-// only perform the domain operation if it is new or the user controls it
-FOREACH (x IN CASE WHEN owner IS NULL THEN [1] WHEN owner.id = u.id THEN [1] ELSE [] END |
-  MERGE (o:EmailAddress {address: {3}})
-  
-  MERGE (u)-[:OWNS]->(d)
-  MERGE (d)-[:OWNS]->(o)
-  MERGE (o)<-[:SENDS_THROUGH]-(e)
-)
-// otherwise set this address to send through itself
-FOREACH (x IN CASE WHEN owner IS NOT NULL AND owner.id <> u.id THEN [1] ELSE [] END |
-  MERGE (e)-[:SENDS_THROUGH]->(e)
-)
-
-RETURN CASE WHEN owner IS NOT NULL AND owner.id <> u.id THEN false ELSE true END AS ok
-           `, userId, address, domainName, outboundaddr)
-	if err != nil || ok != true {
-		log.WithFields(log.Fields{
-			"address":      address,
-			"outboundaddr": outboundaddr,
-			"err":          err.Error(),
-		}).Warn("failed to set outboundaddr")
+MERGE (u)-[:OWNS]->(d)
+MERGE (d)-[:OWNS]->(o)
+MERGE (o)<-[:SENDS_THROUGH]-(e)
+   `, userId, address, domainName, outboundaddr)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"address":      address,
+				"outboundaddr": outboundaddr,
+				"err":          err.Error(),
+			}).Warn("failed to set outboundaddr")
+		}
 	}
 	return
+}
+
+func MaybeReleaseDomainFromOwner(domainName string) error {
+	_, err := DB.Exec(`
+MATCH (d:Domain {host: {0}})
+OPTIONAL MATCH (d)<-[ownership:OWNS]-(:User)
+OPTIONAL MATCH (d)-[:OWNS]->(:EmailAddress:External)<-[s:SENDS_THROUGH]-(:EmailAddress)
+
+WITH ownership, s
+
+// delete ownership from domain when no emailaddress it
+// is being used in relation with a fundamental address
+FOREACH (x IN CASE WHEN s IS NULL THEN [1] ELSE [] END |
+  DELETE ownership
+)
+    `, domainName)
+	return err
+}
+
+func SaveRouteId(outboundaddr, routeId string) (err error) {
+	var found bool
+	err = DB.Get(&found, `
+MATCH (out:EmailAddress:External {address: {0}})<-[sends:SENDS_THROUGH]-()
+SET sends.routeId = {1}
+RETURN CASE WHEN out IS NOT NULL THEN true ELSE false END AS found
+    `, outboundaddr, routeId)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errors.New("couldn't find address " + outboundaddr)
+	}
+	return nil
 }
 
 func GetTargetListForEmailAddress(address string) (listId string, err error) {
@@ -268,10 +346,31 @@ LIMIT 1
 	return queryResult.ShortLink, nil
 }
 
+func ListAddressesOnDomain(domainName string) (domains []string, err error) {
+	err = DB.Select(&domains, `
+MATCH (:Domain {host: {0}})-[:OWNS]->(e:EmailAddress)
+  WHERE (e)<-[:SENDS_THROUGH]-()
+RETURN e.address
+    `, domainName)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return domains, nil
+		} else {
+			return nil, err
+		}
+	}
+	return domains, nil
+}
+
 func SaveCardWithEmail(emailAddress, cardShortLink, cardId, webhookId string) (err error) {
 	if cardShortLink == "" || cardId == "" || webhookId == "" {
-		log.Print("SaveCardWithEmail got arguments: ", emailAddress, ", ", cardShortLink, ", ", cardId, ", ", webhookId)
-		return errors.New("missing argument to SaveCardWithEmail.")
+		log.WithFields(log.Fields{
+			"emailAddress":  emailAddress,
+			"cardShortLink": cardShortLink,
+			"cardId":        cardId,
+			"webhookId":     webhookId,
+		}).Error("missing arguments to SaveCardWithEmail")
+		return errors.New("missing arguments")
 	}
 
 	_, err = DB.Exec(`
@@ -322,6 +421,7 @@ func GetEmailParamsForCard(shortLink string) (params struct {
 	LastMailSubject string   `db:"lastMailSubject"`
 	InboundAddr     string   `db:"inbound"`
 	OutboundAddr    string   `db:"outbound"`
+	ReplyTo         string   `db:"replyTo"`
 	Recipients      []string `db:"recipients"`
 }, err error) {
 	err = DB.Get(&params, `
@@ -330,9 +430,7 @@ MATCH (outbound:EmailAddress)-[:SENDS_THROUGH]-(addr)
 MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
 
 WITH
- c,
- outbound,
- addr,
+ c, outbound, addr,
  reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
  collect(DISTINCT m.from) AS recipients
         
@@ -341,6 +439,7 @@ RETURN
  lastMail.subject AS lastMailSubject,
  addr.address AS inbound,
  outbound.address AS outbound,
+ CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
  recipients
 LIMIT 1`, shortLink)
 	return

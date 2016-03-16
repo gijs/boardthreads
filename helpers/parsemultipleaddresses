@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+
+var addressparser = require('addressparser')
+
+function parse (initial) {
+  var addresses = addressparser(initial)
+  if (addresses.length && addresses[0].address) {
+    return addresses.map(function (addr) { return addr.address })
+  }
+}
+
+var addresses = parse(process.argv[2])
+if (addresses) {
+  process.stdout.write(addresses.join(','))
+} else {
+  process.stdout.write('')
+}

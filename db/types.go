@@ -29,3 +29,12 @@ type Email struct {
 	From      string         `json:"from"      db:"from"`
 	CommentId string         `json:"commentId" db:"commentId"`
 }
+
+type emailParams struct {
+	LastMailId      string   `db:"lastMailId"`
+	LastMailSubject string   `db:"lastMailSubject"`
+	InboundAddr     string   `db:"inbound"`
+	OutboundAddr    string   `db:"outbound"`
+	ReplyTo         string   `db:"replyTo"`
+	Recipients      []string `db:"recipients"`
+}

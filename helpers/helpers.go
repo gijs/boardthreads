@@ -12,9 +12,23 @@ import (
 	"github.com/websitesfortrello/mailgun-go"
 )
 
+var here string
+
+func init() {
+	if os.Getenv("GOPATH") != "" {
+		here = filepath.Join(os.Getenv("GOPATH"), "src/bt/helpers")
+	} else {
+		log.Info("no GOPATH found.")
+		var err error
+		here, err = filepath.Abs("./helpers")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
 func HTMLToMarkdown(html string) string {
-	abspath, _ := filepath.Abs("./helpers/html2markdown")
-	command := exec.Command(abspath, html)
+	command := exec.Command(filepath.Join(here, "html2markdown"), html)
 
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -34,8 +48,7 @@ func HTMLToMarkdown(html string) string {
 }
 
 func ParseAddress(from string) string {
-	abspath, _ := filepath.Abs("./helpers/parseaddress")
-	command := exec.Command(abspath, from)
+	command := exec.Command(filepath.Join(here, "parseaddress"), from)
 
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -48,6 +61,25 @@ func ParseAddress(from string) string {
 	}
 
 	return string(output)
+}
+
+func ParseMultipleAddresses(to string) ([]string, error) {
+	command := exec.Command(filepath.Join(here, "parsemultipleaddresses"), to)
+
+	output, err := command.CombinedOutput()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":       err.Error(),
+			"addresses": to,
+			"stderr":    string(output),
+		}).Warn("couldn't parse")
+		return nil, err
+	}
+
+	// the JS script will print the result as a list of comma-separated addresses
+	addresses := strings.Split(string(output), ",")
+
+	return addresses, nil
 }
 
 func ExtractSubject(subject string) string {

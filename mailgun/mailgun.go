@@ -10,9 +10,9 @@ import (
 )
 
 type Settings struct {
-	ApiKey string `envconfig:"MAILGUN_API_KEY"`
-	Domain string `envconfig:"BASE_DOMAIN"`
-	Secret string `envconfig:"SESSION_SECRET"`
+	ApiKey     string `envconfig:"MAILGUN_API_KEY"`
+	BaseDomain string `envconfig:"BASE_DOMAIN"`
+	Secret     string `envconfig:"SESSION_SECRET"`
 }
 
 var Client mailgun.Mailgun
@@ -25,11 +25,17 @@ func init() {
 		log.Fatal(err.Error())
 	}
 
-	Client = mailgun.NewMailgun(settings.Domain, settings.ApiKey, "")
+	Client = mailgun.NewMailgun(settings.BaseDomain, settings.ApiKey, "")
 }
 
 func Send(params NewMessage) (messageId string, err error) {
-	message := Client.NewMessage(params.From, params.Subject, params.Text, params.Recipients...)
+	// we need a different client if we are to use an external domain
+	localClient := Client
+	if params.Domain != settings.BaseDomain {
+		localClient = mailgun.NewMailgun(params.Domain, settings.ApiKey, "")
+	}
+
+	message := localClient.NewMessage(params.From, params.Subject, params.Text, params.Recipients...)
 	if params.HTML != "" {
 		params.HTML = string(gfm.Markdown([]byte(params.Text)))
 	}
@@ -43,7 +49,7 @@ func Send(params NewMessage) (messageId string, err error) {
 		message.SetTrackingClicks(false)
 		message.SetTrackingOpens(false)
 	}
-	status, messageId, err := Client.Send(message)
+	status, messageId, err := localClient.Send(message)
 	if err != nil {
 		log.Print("error sending email: ", status)
 		return "", err

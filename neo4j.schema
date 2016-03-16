@@ -29,6 +29,7 @@
 
 # constraints
 CREATE CONSTRAINT ON (card:Card) ASSERT card.shortLink IS UNIQUE
+CREATE CONSTRAINT ON (card:Card) ASSERT card.id IS UNIQUE
 CREATE CONSTRAINT ON (board:Board) ASSERT board.shortLink IS UNIQUE
 CREATE CONSTRAINT ON (list:List) ASSERT list.id IS UNIQUE
 CREATE CONSTRAINT ON (mail:Mail) ASSERT mail.id IS UNIQUE

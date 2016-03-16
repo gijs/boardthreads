@@ -6,6 +6,7 @@ type NewMessage struct {
 	Text          string
 	Recipients    []string
 	From          string
+	Domain        string
 	Subject       string
 	InReplyTo     string
 	ReplyTo       string

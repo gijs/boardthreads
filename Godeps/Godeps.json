@@ -162,6 +162,10 @@
 			"ImportPath": "gopkg.in/tylerb/graceful.v1",
 			"Comment": "v1.2.3",
 			"Rev": "48afeb21e2fcbcff0f30bd5ad6b97747b0fae38e"
+		},
+		{
+			"ImportPath": "gopkg.in/validator.v2",
+			"Rev": "3e4f037f12a1221a0864cf0dd2e81c452ab22448"
 		}
 	]
 }

@@ -77,26 +77,29 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	r.ParseForm()
-	recipient := r.PostFormValue("recipient")
+	inboundAddr := r.PostFormValue("recipient")
 	url := r.PostFormValue("message-url")
 
 	logger.WithFields(log.Fields{
-		"recipient": recipient,
+		"recipient": inboundAddr,
 		"url":       url,
 	}).Info("got mail")
 
 	// target list for this email
-	listId, err := db.GetTargetListForEmailAddress(recipient)
+	listId, err := db.GetTargetListForEmailAddress(inboundAddr)
 	if err != nil {
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
 	if listId == "" {
-		logger.Warn("no list registered for address " + recipient)
+		logger.Warn("no list registered for address " + inboundAddr)
 		sendJSONError(w, errors.New("no list registered for address."), 406, logger)
 		return
 	}
+
+	// fetch userId for this address
+	userId, _ := db.GetUserForAddress(inboundAddr)
 
 	// fetch entire email message
 	urlp := strings.Split(url, "/")
@@ -106,6 +109,30 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		sendJSONError(w, err, 503, logger)
 		return
 	}
+
+	// check if this email was received on an outboundaddr (via mailgun redirect)
+	//toHeader := helpers.MessageHeader(message, "To")
+	//to := inboundAddr // default
+	//for {
+	//	if toHeader == "" {
+	//		break
+	//	}
+	//	potentialAddresses, err := helpers.ParseMultipleAddresses(toHeader)
+	//	if err != nil {
+	//		break
+	//	}
+	//	address, err := db.GetAddress(userId, inboundAddr)
+	//	if err != nil {
+	//		break
+	//	}
+	//	for _, addr := range potentialAddresses {
+	//		if addr == address.OutboundAddr {
+	//			to = addr // only here we set `to` to a value different from the default
+	//			break
+	//		}
+	//	}
+	//	break
+	//}
 
 	// card creation process
 	createCard := func() *goTrello.Card {
@@ -130,7 +157,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 
-		err = db.SaveCardWithEmail(recipient, card.ShortLink, card.Id, webhookId)
+		err = db.SaveCardWithEmail(inboundAddr, card.ShortLink, card.Id, webhookId)
 		if err != nil {
 			reportError(raygun, err, logger)
 			sendJSONError(w, err, 500, logger)
@@ -144,7 +171,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		helpers.MessageHeader(message, "In-Reply-To"),
 		message.Subject,
 		helpers.ReplyToOrFrom(message),
-		recipient,
+		inboundAddr,
 	)
 	if err != nil {
 		reportError(raygun, err, logger)
@@ -158,12 +185,18 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		card, err = trello.Client.Card(shortLink)
 		if err != nil {
 			// card doesn't exist on trello, delete it from db
+			log.WithFields(log.Fields{
+				"card": shortLink,
+				"err":  err.Error(),
+			}).Warn("card doesn't exist on trello, deleting it from db")
 			err = db.RemoveCard(shortLink)
 
 			if err != nil {
 				reportError(raygun, err, logger)
-				sendJSONError(w, err, 409, logger)
-				return
+				log.WithFields(log.Fields{
+					"card": shortLink,
+					"err":  err.Error(),
+				}).Warn("couldn't delete card from db. proceeding to create anyway.")
 			}
 
 			// then proceed to the card creation process
@@ -178,7 +211,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		// card doesn't exist on our db, proceed to the card creaion proccess
+		// card doesn't exist on our db, proceed to the card creation proccess
 		card = createCard()
 	}
 
@@ -323,14 +356,13 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 
 	// tracking
-	userId, _ := db.GetUserForAddress(recipient)
 	segment.Track(&analytics.Track{
 		Event:  "Received mail",
 		UserId: userId,
 		Properties: map[string]interface{}{
 			"card":    card.Id,
 			"from":    helpers.ReplyToOrFrom(message),
-			"address": recipient,
+			"address": inboundAddr,
 		},
 	})
 }
@@ -429,8 +461,8 @@ sendMail:
 		sendingAddr = params.InboundAddr
 	} else {
 		domain := strings.Split(params.OutboundAddr, "@")[1]
+		logger.Debug("trying to send from " + sendingAddr)
 		if domain != settings.BaseDomain {
-			// logger.Debug("trying the address ", sendingAddr, ", domain ", domain)
 			canSend, canReceive := mailgun.DomainCanSendReceive(domain)
 			if !canSend {
 				sendingAddr = params.InboundAddr
@@ -457,6 +489,7 @@ sendMail:
 		Text:          strippedText,
 		Recipients:    params.Recipients,
 		From:          sendingAddr,
+		Domain:        strings.Split(sendingAddr, "@")[1],
 		Subject:       helpers.ExtractSubject(params.LastMailSubject),
 		InReplyTo:     params.LastMailId,
 		ReplyTo:       params.ReplyTo,

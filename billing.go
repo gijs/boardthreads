@@ -18,11 +18,6 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
-	referrer := r.Referer()
-	if referrer == "" {
-		referrer = "https://" + settings.BaseDomain
-	}
-
 	vars := mux.Vars(r)
 	emailAddress := vars["address"] + "@" + settings.BaseDomain
 
@@ -41,7 +36,8 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"ownerId": addressOwnerId,
 		}).Error("couldn't verify user ownership of this address")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, referrer+"#error=We couldn't assert that you control the address "+emailAddress+".", http.StatusFound)
+		http.Redirect(w, r, settings.DashboardURL+"#error=We couldn't assert that you control the address "+emailAddress+".", http.StatusFound)
+		return
 	}
 
 	successURL, _ := router.Get("paypal-success").URL("address", vars["address"])
@@ -62,7 +58,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"stderr":  paypalPayURL,
 		}).Error("couldn't get paypal auth url")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, referrer+"#error=Misterious error.", http.StatusFound)
+		http.Redirect(w, r, settings.DashboardURL+"#error=Misterious error.", http.StatusFound)
 		return
 	}
 
@@ -87,11 +83,6 @@ func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
-	referrer := r.Referer()
-	if referrer == "" {
-		referrer = "https://" + settings.BaseDomain
-	}
-
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
 	vars := mux.Vars(r)
 
@@ -115,11 +106,6 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
-	referrer := r.Referer()
-	if referrer == "" {
-		referrer = "https://" + settings.BaseDomain
-	}
-
 	vars := mux.Vars(r)
 	emailAddress := vars["address"] + "@" + settings.BaseDomain
 
@@ -137,7 +123,7 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 			"stderr":  profileId,
 		}).Error("couldn't create subscription on paypal")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, referrer+"#error=Couldn't create your subscription for some reason, please contact us.", http.StatusFound)
+		http.Redirect(w, r, settings.DashboardURL+"#error=Couldn't create your subscription for some reason, please contact us.", http.StatusFound)
 		return
 	}
 
@@ -150,11 +136,11 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 			"profileId": profileId,
 		}).Error("couldn't save paypal subscription on db")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, referrer+"#error=We have created your subscription, but due to an horrible error on our systems your list status couldn't be upgraded. Please contact us immediately and inform this number: "+profileId, http.StatusFound)
+		http.Redirect(w, r, settings.DashboardURL+"#error=We have created your subscription, but due to an horrible error on our systems your list status couldn't be upgraded. Please contact us immediately and inform this number: "+profileId, http.StatusFound)
 		return
 	}
 
-	http.Redirect(w, r, referrer+"#success=Your subscription has been successfully created.", http.StatusFound)
+	http.Redirect(w, r, settings.DashboardURL+"#success=Your subscription has been successfully created.", http.StatusFound)
 
 	// tracking
 	segment.Track(&analytics.Track{
@@ -169,11 +155,6 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 }
 
 func PaypalFailure(w http.ResponseWriter, r *http.Request) {
-	referrer := r.Referer()
-	if referrer == "" {
-		referrer = "https://" + settings.BaseDomain
-	}
-
 	query := r.URL.Query()
 	userId := query.Get("userId")
 
@@ -184,5 +165,5 @@ func PaypalFailure(w http.ResponseWriter, r *http.Request) {
 		"userId":  userId,
 	}).Error("paypal failure")
 
-	http.Redirect(w, r, referrer+"#error=Couldn't authorize the payment. That's all we know.", http.StatusFound)
+	http.Redirect(w, r, settings.DashboardURL+"#error=Couldn't authorize the payment. That's all we know.", http.StatusFound)
 }

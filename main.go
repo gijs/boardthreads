@@ -22,9 +22,10 @@ import (
 
 type Settings struct {
 	Port           string `envconfig:"PORT"`
-	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
 	ServiceURL     string `envconfig:"SERVICE_URL"`
+	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
 	BaseDomain     string `envconfig:"BASE_DOMAIN"`
+	DashboardURL   string `envconfig:"DASHBOARD_URL"`
 	SessionSecret  string `envconfig:"SESSION_SECRET"`
 	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
 	MailgunAPIKey  string `envconfig:"MAILGUN_API_KEY"`

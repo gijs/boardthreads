@@ -7,6 +7,8 @@ import (
 
 	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 )
 
@@ -50,7 +52,37 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, paypalPayURL, http.StatusFound)
 }
 
-func DowngradeList(w http.ResponseWriter, r *http.Request) {}
+func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
+	/*
+	   this is the only handler from this file that doesn't return
+	   a redirect, also it expects a JWT.
+	*/
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
+
+	referrer := r.Referer()
+	if referrer == "" {
+		referrer = "https://" + settings.BaseDomain
+	}
+
+	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
+	vars := mux.Vars(r)
+
+	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 400, logger)
+		return
+	}
+
+	err = MaybeDowngradeAddress(address)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 500, logger)
+	}
+
+	w.WriteHeader(200)
+}
 
 func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)

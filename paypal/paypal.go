@@ -71,3 +71,15 @@ func CreateSubscription(userId, address, token, payerId string) (profileId strin
 }
 
 const descPrefix string = "boardthreads.com subscription for address "
+
+func DeleteSubscription(profileId string) error {
+	command := exec.Command(filepath.Join(here, "delete-subscription"), profileId)
+
+	output, err := command.CombinedOutput()
+	if err != nil {
+		log.Debug(string(output))
+		return err
+	}
+
+	return nil
+}

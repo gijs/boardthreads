@@ -137,10 +137,15 @@ DELETE n,r
 				SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
 				Expect(SavePaypalProfileId("gorilla", "gorilla-support@boardthreads.com", "pay33746")).To(Succeed())
 
-				var ok bool
-				err := DB.Get(&ok, `MATCH (:EmailAddress {address: "gorilla-support@boardthreads.com"})<-[c:CONTROLS]-(:User {id: "gorilla"}) RETURN CASE WHEN c.paypalProfileId = "pay33746" THEN true ELSE false END AS ok`)
-				Expect(err).To(BeNil())
-				Expect(ok).To(Equal(true))
+				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
+				Expect(addr.PaypalProfileId).To(Equal("pay33746"))
+			})
+
+			g.It("should remove billing from an address", func() {
+				Expect(RemovePaypalProfileId("gorilla-support@boardthreads.com")).To(Succeed())
+
+				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
+				Expect(addr.PaypalProfileId).To(Equal(""))
 			})
 
 		})

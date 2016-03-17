@@ -487,3 +487,11 @@ SET c.paypalProfileId = {2}
 `, userId, address, paypalProfileId)
 	return
 }
+
+func RemovePaypalProfileId(address string) (err error) {
+	_, err = DB.Exec(`
+MATCH (:EmailAddress {address: {0}})<-[c:CONTROLS]-(:User)
+SET c.paypalProfileId = null
+`, address)
+	return
+}

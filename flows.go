@@ -3,6 +3,7 @@ package main
 import (
 	"bt/db"
 	"bt/mailgun"
+	"bt/paypal"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -66,4 +67,31 @@ func MaybeFillDomainInformation(address *db.Address) {
 		}
 		address.DomainStatus = domain
 	}
+}
+
+func MaybeDowngradeAddress(address *db.Address) error {
+	if address.PaypalProfileId == "" {
+		return nil
+	}
+
+	err := paypal.DeleteSubscription(address.PaypalProfileId)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":             err.Error(),
+			"address":         address.InboundAddr,
+			"paypalProfileId": address.PaypalProfileId,
+		}).Warn("couldn't cancel paypal subscription")
+		return nil
+	}
+
+	err = db.RemovePaypalProfileId(address.InboundAddr)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":             err.Error(),
+			"address":         address.InboundAddr,
+			"paypalProfileId": address.PaypalProfileId,
+		}).Error("failed to remove paypalProfileId from address")
+		return err
+	}
+	return nil
 }

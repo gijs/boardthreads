@@ -319,6 +319,13 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// remove paypalProfileId and cancel subscription
+	err = MaybeDowngradeAddress(address)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 503, logger)
+	}
+
 	// remove old domains and routes
 	MaybeDeleteDomainAndRouteFlow(address, "")
 

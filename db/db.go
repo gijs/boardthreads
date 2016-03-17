@@ -89,6 +89,7 @@ MATCH (u)-[c:CONTROLS]->(addr:EmailAddress)-->(l:List)
 OPTIONAL MATCH (addr)-[:SENDS_THROUGH]->(o) WHERE o.address <> addr.address
 RETURN
   l.id AS listId,
+  u.id AS userId,
   addr.date AS start,
   addr.address AS inboundaddr,
   CASE WHEN o.address IS NOT NULL THEN o.address ELSE addr.address END AS outboundaddr,

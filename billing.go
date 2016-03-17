@@ -3,6 +3,7 @@ package main
 import (
 	"bt/db"
 	"bt/paypal"
+	"errors"
 	"net/http"
 
 	"github.com/MindscapeHQ/raygun4go"
@@ -27,6 +28,21 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	userId := query.Get("userId")
+
+	addressOwnerId, err := db.GetUserForAddress(emailAddress)
+	if addressOwnerId != userId {
+		err = errors.New(userId + " doesn't own " + emailAddress + " because " + addressOwnerId + " does")
+	}
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":     err.Error(),
+			"address": emailAddress,
+			"userId":  userId,
+			"ownerId": addressOwnerId,
+		}).Error("couldn't verify user ownership of this address")
+		reportError(raygun, err, logger)
+		http.Redirect(w, r, referrer+"#error=We couldn't assert that you control the address "+emailAddress+".", http.StatusFound)
+	}
 
 	successURL, _ := router.Get("paypal-success").URL("address", vars["address"])
 	successURL.RawQuery = "userId=" + userId

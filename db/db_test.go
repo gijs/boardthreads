@@ -47,6 +47,7 @@ DELETE n,r
 
 		g.It("should get that address", func() {
 			address := Address{
+				UserId:       "maria",
 				ListId:       "l43834",
 				InboundAddr:  "maria@boardthreads.com",
 				OutboundAddr: "maria@boardthreads.com",
@@ -60,6 +61,7 @@ DELETE n,r
 			Expect(new).To(Equal(false))
 
 			address := Address{
+				UserId:       "maria",
 				ListId:       "l49983",
 				InboundAddr:  "maria@boardthreads.com",
 				OutboundAddr: "maria@boardthreads.com",
@@ -75,6 +77,7 @@ DELETE n,r
 			Expect(outboundaddr).To(Equal("help@maria.com"))
 
 			address := Address{
+				UserId:       "maria",
 				ListId:       "l49983",
 				InboundAddr:  "maria@boardthreads.com",
 				OutboundAddr: "help@maria.com",

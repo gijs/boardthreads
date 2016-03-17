@@ -78,6 +78,7 @@ LIMIT 1
 			return nil, nil
 		}
 	}
+	address.UserId = userId
 	return &address, nil
 }
 

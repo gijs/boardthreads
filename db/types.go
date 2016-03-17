@@ -12,6 +12,7 @@ type Account struct {
 
 type Address struct {
 	Start           types.NullTime  `json:"start"                     db:"start"`
+	UserId          string          `json:"-"`
 	BoardShortLink  string          `json:"boardShortLink"            db:"boardShortLink"`
 	ListId          string          `json:"listId"                    db:"listId"`
 	InboundAddr     string          `json:"inboundaddr"               db:"inboundaddr"`

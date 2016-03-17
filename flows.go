@@ -6,6 +6,7 @@ import (
 	"bt/paypal"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/segmentio/analytics-go"
 )
 
 func MaybeDeleteDomainAndRouteFlow(oldAddress *db.Address, newOutboundAddr string) {
@@ -93,5 +94,16 @@ func MaybeDowngradeAddress(address *db.Address) error {
 		}).Error("failed to remove paypalProfileId from address")
 		return err
 	}
+
+	// tracking
+	segment.Track(&analytics.Track{
+		Event:  "Cancelled subscription",
+		UserId: address.UserId,
+		Properties: map[string]interface{}{
+			"address":  address.InboundAddr,
+			"provider": "Paypal",
+		},
+	})
+
 	return nil
 }

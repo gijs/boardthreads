@@ -10,6 +10,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/segmentio/analytics-go"
 )
 
 func UpgradeList(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +23,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	address := vars["address"] + "@" + settings.BaseDomain
+	emailAddress := vars["address"] + "@" + settings.BaseDomain
 
 	query := r.URL.Query()
 	userId := query.Get("userId")
@@ -33,7 +34,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	failureURL.RawQuery = "userId=" + userId
 
 	paypalPayURL, err := paypal.GetAuthURL(userId,
-		address,
+		emailAddress,
 		settings.ServiceURL+successURL.String(),
 		settings.ServiceURL+failureURL.String(),
 	)
@@ -41,7 +42,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"err":     err.Error(),
 			"userId":  userId,
-			"address": address,
+			"address": emailAddress,
 			"stderr":  paypalPayURL,
 		}).Error("couldn't get paypal auth url")
 		reportError(raygun, err, logger)
@@ -50,6 +51,16 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, paypalPayURL, http.StatusFound)
+
+	// tracking
+	segment.Track(&analytics.Track{
+		Event:  "Started subscription creation",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"address":  emailAddress,
+			"provider": "Paypal",
+		},
+	})
 }
 
 func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
@@ -94,19 +105,19 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	address := vars["address"] + "@" + settings.BaseDomain
+	emailAddress := vars["address"] + "@" + settings.BaseDomain
 
 	query := r.URL.Query()
 	userId := query.Get("userId")
 	token := query.Get("token")
 	payerId := query.Get("PayerID")
 
-	profileId, err := paypal.CreateSubscription(userId, address, token, payerId)
+	profileId, err := paypal.CreateSubscription(userId, emailAddress, token, payerId)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err":     err.Error(),
 			"userId":  userId,
-			"address": address,
+			"address": emailAddress,
 			"stderr":  profileId,
 		}).Error("couldn't create subscription on paypal")
 		reportError(raygun, err, logger)
@@ -114,12 +125,12 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.SavePaypalProfileId(userId, address, profileId)
+	err = db.SavePaypalProfileId(userId, emailAddress, profileId)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err":       err.Error(),
 			"userId":    userId,
-			"address":   address,
+			"address":   emailAddress,
 			"profileId": profileId,
 		}).Error("couldn't save paypal subscription on db")
 		reportError(raygun, err, logger)
@@ -128,6 +139,17 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, referrer+"#success=Your subscription has been successfully created.", http.StatusFound)
+
+	// tracking
+	segment.Track(&analytics.Track{
+		Event:  "Created subscription",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"address":  emailAddress,
+			"value":    10,
+			"provider": "Paypal",
+		},
+	})
 }
 
 func PaypalFailure(w http.ResponseWriter, r *http.Request) {
@@ -146,5 +168,5 @@ func PaypalFailure(w http.ResponseWriter, r *http.Request) {
 		"userId":  userId,
 	}).Error("paypal failure")
 
-	http.Redirect(w, r, referrer+"#error=There was a problem in your Paypal authorization. That's all we know.", http.StatusFound)
+	http.Redirect(w, r, referrer+"#error=Couldn't authorize the payment. That's all we know.", http.StatusFound)
 }

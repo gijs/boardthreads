@@ -2,6 +2,7 @@ package db
 
 import (
 	"bt/mailgun"
+	"time"
 
 	"gopkg.in/cq.v1/types"
 )
@@ -10,17 +11,40 @@ type Account struct {
 	Addresses []Address `json:"addresses"`
 }
 
+type addressStatus string
+
+const (
+	VALID    addressStatus = "VALID"
+	TRIAL    addressStatus = "TRIAL"
+	DISABLED addressStatus = "DISABLED"
+)
+
 type Address struct {
-	Start           types.NullTime  `json:"start"                     db:"start"`
-	UserId          string          `json:"-"                         db:"userId"`
-	BoardShortLink  string          `json:"boardShortLink"            db:"boardShortLink"`
-	ListId          string          `json:"listId"                    db:"listId"`
-	InboundAddr     string          `json:"inboundaddr"               db:"inboundaddr"`
-	OutboundAddr    string          `json:"outboundaddr"              db:"outboundaddr"`
-	RouteId         string          `json:"-"                         db:"routeId"`
-	PaypalProfileId string          `json:"paypalProfileId,omitempty" db:"paypalProfileId"`
-	DomainName      string          `json:"-"                         db:"domain"`
+	Start           int64           `json:"-"                db:"date"`
+	UserId          string          `json:"-"                db:"userId"`
+	BoardShortLink  string          `json:"boardShortLink"   db:"boardShortLink"`
+	ListId          string          `json:"listId"           db:"listId"`
+	InboundAddr     string          `json:"inboundaddr"      db:"inboundaddr"`
+	OutboundAddr    string          `json:"outboundaddr"     db:"outboundaddr"`
+	RouteId         string          `json:"-"                db:"routeId"`
+	DomainName      string          `json:"-"                db:"domain"`
 	DomainStatus    *mailgun.Domain `json:"domain,omitempty"`
+	PaypalProfileId string          `json:"-"                db:"paypalProfileId"`
+	Status          addressStatus   `json:"status"`
+}
+
+func (addr *Address) StartTime() time.Time {
+	return time.Unix(addr.Start/1000, 0)
+}
+
+func (addr *Address) SetStatus() {
+	if addr.PaypalProfileId != "" {
+		addr.Status = VALID
+	} else if time.Since(addr.StartTime()).Hours() > 1488 {
+		addr.Status = DISABLED
+	} else {
+		addr.Status = TRIAL
+	}
 }
 
 type Email struct {

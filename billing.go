@@ -4,6 +4,7 @@ import (
 	"bt/db"
 	"bt/paypal"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/MindscapeHQ/raygun4go"
@@ -18,11 +19,9 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
+	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
 	vars := mux.Vars(r)
 	emailAddress := vars["address"] + "@" + settings.BaseDomain
-
-	query := r.URL.Query()
-	userId := query.Get("userId")
 
 	addressOwnerId, err := db.GetUserForAddress(emailAddress)
 	if addressOwnerId != userId {
@@ -36,7 +35,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"ownerId": addressOwnerId,
 		}).Error("couldn't verify user ownership of this address")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, settings.DashboardURL+"#error=We couldn't assert that you control the address "+emailAddress+".", http.StatusFound)
+		sendJSONError(w, err, 403, logger)
 		return
 	}
 
@@ -58,11 +57,11 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"stderr":  paypalPayURL,
 		}).Error("couldn't get paypal auth url")
 		reportError(raygun, err, logger)
-		http.Redirect(w, r, settings.DashboardURL+"#error=Misterious error.", http.StatusFound)
+		sendJSONError(w, err, 500, logger)
 		return
 	}
 
-	http.Redirect(w, r, paypalPayURL, http.StatusFound)
+	fmt.Fprintf(w, paypalPayURL)
 
 	// tracking
 	segment.Track(&analytics.Track{
@@ -76,10 +75,6 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 }
 
 func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
-	/*
-	   this is the only handler from this file that doesn't return
-	   a redirect, also it expects a JWT.
-	*/
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 

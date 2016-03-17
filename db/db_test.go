@@ -46,28 +46,26 @@ DELETE n,r
 		})
 
 		g.It("should get that address", func() {
-			address := Address{
-				UserId:       "maria",
-				ListId:       "l43834",
-				InboundAddr:  "maria@boardthreads.com",
-				OutboundAddr: "maria@boardthreads.com",
-			}
-			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{address}))
-			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(&address))
+			addr, err := GetAddress("maria", "maria@boardthreads.com")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
+			Expect(addr.UserId).To(Equal("maria"))
+			Expect(addr.ListId).To(Equal("l43834"))
+			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
+			Expect(addr.OutboundAddr).To(Equal("maria@boardthreads.com"))
 		})
 
 		g.It("should change the target list", func() {
 			new, _, _ := SetAddress("maria", "b77837", "l49983", "maria@boardthreads.com", "maria@boardthreads.com")
 			Expect(new).To(Equal(false))
 
-			address := Address{
-				UserId:       "maria",
-				ListId:       "l49983",
-				InboundAddr:  "maria@boardthreads.com",
-				OutboundAddr: "maria@boardthreads.com",
-			}
-			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{address}))
-			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(&address))
+			addr, err := GetAddress("maria", "maria@boardthreads.com")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
+			Expect(addr.UserId).To(Equal("maria"))
+			Expect(addr.ListId).To(Equal("l49983"))
+			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
+			Expect(addr.OutboundAddr).To(Equal("maria@boardthreads.com"))
 		})
 
 		g.It("should change the outboundaddr", func() {
@@ -76,16 +74,15 @@ DELETE n,r
 			Expect(new).To(Equal(false))
 			Expect(outboundaddr).To(Equal("help@maria.com"))
 
-			address := Address{
-				UserId:       "maria",
-				ListId:       "l49983",
-				InboundAddr:  "maria@boardthreads.com",
-				OutboundAddr: "help@maria.com",
-			}
-			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{address}))
-
-			address.DomainName = "maria.com" // GetAddress returns this, GetAddresses don't
-			Expect(GetAddress("maria", "maria@boardthreads.com")).To(BeEquivalentTo(&address))
+			addr, err := GetAddress("maria", "maria@boardthreads.com")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(addr.UserId).To(Equal("maria"))
+			Expect(addr.ListId).To(Equal("l49983"))
+			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
+			Expect(addr.OutboundAddr).To(Equal("help@maria.com"))
+			Expect(addr.DomainName).To(Equal("maria.com"))
+			addr.DomainName = "" // GetAddress returns this, GetAddresses don't
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 		})
 
 		g.It("should get the owner of an address", func() {
@@ -138,17 +135,25 @@ DELETE n,r
 
 			g.It("should create an address with billing", func() {
 				SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
+				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
+				addr.SetStatus()
+				Expect(addr.Status).To(Equal(TRIAL))
+
 				Expect(SavePaypalProfileId("gorilla", "gorilla-support@boardthreads.com", "pay33746")).To(Succeed())
 
-				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
+				addr, _ = GetAddress("gorilla", "gorilla-support@boardthreads.com")
 				Expect(addr.PaypalProfileId).To(Equal("pay33746"))
+				addr.SetStatus()
+				Expect(addr.Status).To(Equal(VALID))
 			})
 
 			g.It("should remove billing from an address", func() {
 				Expect(RemovePaypalProfileId("gorilla-support@boardthreads.com")).To(Succeed())
 
 				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
+				addr.SetStatus()
 				Expect(addr.PaypalProfileId).To(Equal(""))
+				Expect(addr.Status).To(Equal(TRIAL))
 			})
 
 		})

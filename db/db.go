@@ -61,7 +61,7 @@ OPTIONAL MATCH (addr)-[sends:SENDS_THROUGH]->(o) WHERE o.address <> addr.address
 OPTIONAL MATCH (out)<-[:OWNS]-(d:Domain)<-[:OWNS]-(:User {id: {1}})
 RETURN
   l.id AS listId,
-  addr.date AS start,
+  addr.date AS date,
   addr.address AS inboundaddr,
   CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
   CASE WHEN d.host IS NOT NULL THEN d.host ELSE "" END AS domain,
@@ -78,7 +78,11 @@ LIMIT 1
 			return nil, nil
 		}
 	}
+
+	// post processing
 	address.UserId = userId
+	address.SetStatus()
+
 	return &address, nil
 }
 
@@ -89,12 +93,11 @@ MATCH (u)-[c:CONTROLS]->(addr:EmailAddress)-->(l:List)
 OPTIONAL MATCH (addr)-[:SENDS_THROUGH]->(o) WHERE o.address <> addr.address
 RETURN
   l.id AS listId,
-  u.id AS userId,
-  addr.date AS start,
+  addr.date AS date,
   addr.address AS inboundaddr,
   CASE WHEN o.address IS NOT NULL THEN o.address ELSE addr.address END AS outboundaddr,
   CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
-ORDER BY start
+ORDER BY date
     `, userId)
 	if err != nil {
 		if err.Error() != "sql: no rows in result set" {
@@ -105,6 +108,13 @@ ORDER BY start
 			return addresses, nil
 		}
 	}
+
+	// post processing
+	for i := range addresses {
+		addresses[i].UserId = userId
+		addresses[i].SetStatus()
+	}
+
 	return
 }
 

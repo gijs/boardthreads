@@ -96,7 +96,7 @@ func main() {
 		Handler(jwtMiddle.Handler(http.HandlerFunc(DeleteAddress)))
 
 	router.Path("/billing/{address}/paypal").Methods("GET").
-		Handler(http.HandlerFunc(UpgradeList))
+		Handler(jwtMiddle.Handler(http.HandlerFunc(UpgradeList)))
 	router.Path("/billing/{address}/paypal").Methods("DELETE").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(DowngradeAddress)))
 	router.Path("/billing/{address}/paypal/success").Methods("GET").

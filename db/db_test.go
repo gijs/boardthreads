@@ -131,6 +131,20 @@ DELETE n,r
 			Expect(addresses).To(ContainElement("ana@maria.com"))
 		})
 
+		g.Describe("billing", func() {
+
+			g.It("should create an address with billing", func() {
+				SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
+				Expect(SavePaypalProfileId("gorilla", "gorilla-support@boardthreads.com", "pay33746")).To(Succeed())
+
+				var ok bool
+				err := DB.Get(&ok, `MATCH (:EmailAddress {address: "gorilla-support@boardthreads.com"})<-[c:CONTROLS]-(:User {id: "gorilla"}) RETURN CASE WHEN c.paypalProfileId = "pay33746" THEN true ELSE false END AS ok`)
+				Expect(err).To(BeNil())
+				Expect(ok).To(Equal(true))
+			})
+
+		})
+
 		g.Describe("creating, matching and deleting cards and messages", func() {
 
 			g.It("should set a new user and address", func() {

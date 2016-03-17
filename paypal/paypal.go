@@ -2,16 +2,29 @@ package paypal
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
+
+	log "github.com/Sirupsen/logrus"
 )
 
-func GetAuthURL(userId, address string) (string, error) {
-	command := exec.Command("./authenticate")
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return "", err
-	}
+var here string
 
+func init() {
+	if os.Getenv("GOPATH") != "" {
+		here = filepath.Join(os.Getenv("GOPATH"), "src/bt/paypal")
+	} else {
+		log.Info("no GOPATH found.")
+		var err error
+		here, err = filepath.Abs("./paypal")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func GetAuthURL(userId, address, successURL, failureURL string) (string, error) {
 	arguments, err := json.Marshal(struct {
 		SuccessCallback       string `json:"RETURNURL"`
 		ErrorCallback         string `json:"CANCELURL"`
@@ -19,23 +32,22 @@ func GetAuthURL(userId, address string) (string, error) {
 		BrandName             string `json:"BRANDNAME"`
 		Description           string `json:"L_BILLINGAGREEMENTDESCRIPTION0"`
 		BuyerEmailOptinEnable int    `json:"BUYEREMAILOPTINENABLE"`
-	}{"/billing/paypal/success", "/billing/paypal/failure", 10, "Boardthreads Helpdesk", "boardthreads.com subscription for user" + userId, 0})
+	}{successURL, failureURL, 10, "Boardthreads Helpdesk", descPrefix + address, 0})
 	if err != nil {
 		return "", err
 	}
 
-	stdin.Write(arguments)
-	urlBytes, err := command.Output()
-	return string(urlBytes), err
-}
+	command := exec.Command(filepath.Join(here, "authenticate"), string(arguments))
 
-func CreateSubscription(userId string) error {
-	command := exec.Command("./create-subscription")
-	stdin, err := command.StdinPipe()
+	output, err := command.CombinedOutput()
 	if err != nil {
-		return err
+		return string(output), err
 	}
 
+	return string(output), nil
+}
+
+func CreateSubscription(userId, address, token, payerId string) (profileId string, err error) {
 	arguments, err := json.Marshal(struct {
 		Amount              int    `json:"AMT"`
 		Description         string `json:"DESC"`
@@ -43,12 +55,19 @@ func CreateSubscription(userId string) error {
 		BillingFrequency    int    `json:"BILLINGFREQUENCY"`
 		MaxFailed           int    `json:"MAXFAILEDPAYMENTS"`
 		AutoBillOutstanding string `json:"AUTOBILLOUTAMT"`
-	}{10, "boardthreads.com subscription for user" + userId, "Month", 1, 3, "AddToNextBilling"})
+	}{10, descPrefix + address, "Month", 1, 3, "AddToNextBilling"})
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	stdin.Write(arguments)
-	_, err = command.Output()
-	return err
+	command := exec.Command(filepath.Join(here, "create-subscription"), token, payerId, string(arguments))
+
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return string(output), err
+	}
+
+	return string(output), nil
 }
+
+const descPrefix string = "boardthreads.com subscription for address "

@@ -23,6 +23,7 @@ import (
 type Settings struct {
 	Port           string `envconfig:"PORT"`
 	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
+	ServiceURL     string `envconfig:"SERVICE_URL"`
 	BaseDomain     string `envconfig:"BASE_DOMAIN"`
 	SessionSecret  string `envconfig:"SESSION_SECRET"`
 	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
@@ -32,6 +33,7 @@ type Settings struct {
 }
 
 var settings Settings
+var router *mux.Router
 var segment *analytics.Client
 
 func main() {
@@ -77,7 +79,7 @@ func main() {
 		})
 	})
 
-	router := mux.NewRouter()
+	router = mux.NewRouter()
 	middle.UseHandler(router)
 
 	router.Path("/api/session").Methods("POST").HandlerFunc(SetSession)
@@ -91,6 +93,15 @@ func main() {
 		Handler(jwtMiddle.Handler(http.HandlerFunc(SetAddress)))
 	router.Path("/api/addresses/{address}").Methods("DELETE").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(DeleteAddress)))
+
+	router.Path("/billing/{address}/paypal").Methods("GET").
+		Handler(http.HandlerFunc(UpgradeList))
+	router.Path("/billing/{address}/paypal/success").Methods("GET").
+		Handler(http.HandlerFunc(PaypalSuccess)).
+		Name("paypal-success")
+	router.Path("/billing/{address}/paypal/failure").Methods("GET").
+		Handler(http.HandlerFunc(PaypalFailure)).
+		Name("paypal-failure")
 
 	router.Path("/webhooks/mailgun/email").Methods("POST").HandlerFunc(MailgunIncoming)
 	router.Path("/webhooks/mailgun/success").Methods("POST").HandlerFunc(MailgunSuccess)

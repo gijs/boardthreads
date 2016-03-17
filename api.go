@@ -36,9 +36,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// who is this user in Trello?
-	logger.WithFields(log.Fields{
-		"token": data.TrelloToken,
-	}).Info("logging in")
 	user, err := trello.UserFromToken(data.TrelloToken)
 	if err != nil {
 		reportError(raygun, err, logger)

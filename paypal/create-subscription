@@ -1,23 +1,24 @@
 #!/usr/bin/env node
 
 var Paypal = require('paypal-recurring2')
-var getStdin = require('get-stdin')
 
 var paypal = new Paypal({
-  username: settings.PAYPAL_API_NAME,
-  password: settings.PAYPAL_API_PASSWORD,
-  signature: settings.PAYPAL_API_SIGNATURE
-})
+  username: process.env.PAYPAL_API_NAME,
+  password: process.env.PAYPAL_API_PASSWORD,
+  signature: process.env.PAYPAL_API_SIGNATURE
+}, process.env.PAYPAL_PRODUCTION === "true")
 
-getStdin().then(function () {
-  paypal.createSubscription(token, PayerID, {
-    AMT: 10,
-    DESC: 'boardthreads.com subscription for user ' + ,
-    BILLINGPERIOD: 'Month',
-    BILLINGFREQUENCY: 1,
-    MAXFAILEDPAYMENTS: 3,
-    AUTOBILLOUTAMT: 'AddToNextBilling',
-  }, function (err, data) {
+var t = setTimeout(function () {}, 2000)
 
-  })
+var token = process.argv[2]
+var PayerID = process.argv[3]
+var arg = JSON.parse(process.argv[4])
+
+paypal.createSubscription(token, PayerID, arg, function (err, data) {
+  if (err) {
+    process.stdout.write(err)
+    process.exit(1)
+  }
+  process.stdout.write(data.PROFILEID)
+  clearTimeout(t)
 })

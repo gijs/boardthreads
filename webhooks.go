@@ -110,30 +110,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check if this email was received on an outboundaddr (via mailgun redirect)
-	//toHeader := helpers.MessageHeader(message, "To")
-	//to := inboundAddr // default
-	//for {
-	//	if toHeader == "" {
-	//		break
-	//	}
-	//	potentialAddresses, err := helpers.ParseMultipleAddresses(toHeader)
-	//	if err != nil {
-	//		break
-	//	}
-	//	address, err := db.GetAddress(userId, inboundAddr)
-	//	if err != nil {
-	//		break
-	//	}
-	//	for _, addr := range potentialAddresses {
-	//		if addr == address.OutboundAddr {
-	//			to = addr // only here we set `to` to a value different from the default
-	//			break
-	//		}
-	//	}
-	//	break
-	//}
-
 	// card creation process
 	createCard := func() *goTrello.Card {
 		// card creation process

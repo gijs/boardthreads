@@ -476,3 +476,14 @@ MERGE (commenter)-[:COMMENTED]->(m)
     `, cardShortLink, commenterId, messageId, commentId)
 	return
 }
+
+func SavePaypalProfileId(userId, address, paypalProfileId string) (err error) {
+	_, err = DB.Exec(`
+MATCH (addr:EmailAddress {address: {1}})
+MATCH (u:User {id: {0}})
+MERGE (addr)<-[c:CONTROLS]-(u)
+WITH c
+SET c.paypalProfileId = {2}
+`, userId, address, paypalProfileId)
+	return
+}

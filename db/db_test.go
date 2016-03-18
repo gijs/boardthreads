@@ -162,9 +162,9 @@ DELETE n,r
 
 			g.It("should set a new user and address", func() {
 				EnsureUser("bob")
-				_, outboundaddr, _ := SetAddress("bob", "b34852", "l329847", "bob@boardthreads.com", "emailto@bob.com")
+				_, outboundaddr, _ := SetAddress("bob", "b34852", "l329847", "BOB@boardthreads.com", "emailTo@bob.com")
 				Expect(outboundaddr).To(Equal("emailto@bob.com"))
-				Expect(GetUserForAddress("bob@boardthreads.com")).To(Equal("bob"))
+				Expect(GetUserForAddress("bob@boardTHreads.com")).To(Equal("bob"))
 			})
 
 			g.It("should find a list for a fake received email", func() {
@@ -172,8 +172,8 @@ DELETE n,r
 			})
 
 			g.It("should save new a card after failing to fetch one", func() {
-				Expect(GetCardForMessage("", "this message", "from@someone.com", "bob@boardthreads.com")).To(Equal(""))
-				Expect(SaveCardWithEmail("bob@boardthreads.com", "csl3739", "cid3739", "7676767")).To(Succeed())
+				Expect(GetCardForMessage("", "this message", "frOM@someone.com", "bob@boardthreads.com")).To(Equal(""))
+				Expect(SaveCardWithEmail("boB@boardthreads.com", "csl3739", "cid3739", "7676767")).To(Succeed())
 
 				var ok bool
 				err := DB.Get(&ok, `MATCH (c:Card {id: "cid3739"})-[:LINKED_TO]-(e:EmailAddress {address: "bob@boardthreads.com"}) RETURN CASE WHEN c IS NOT NULL AND e IS NOT NULL THEN true ELSE false END AS ok`)
@@ -182,7 +182,7 @@ DELETE n,r
 			})
 
 			g.It("should save the received email", func() {
-				Expect(SaveEmailReceived("cid3739", "csl3739", "<mid3739>", "this message", "from@someone.com", "comm38754")).To(Succeed())
+				Expect(SaveEmailReceived("cid3739", "csl3739", "<mid3739>", "this message", "From@someone.com", "comm38754")).To(Succeed())
 
 				var ok bool
 				err := DB.Get(&ok, `MATCH (c:Card {id: "cid3739"})-[:CONTAINS]->(m:Mail {id: "<mid3739>", subject: "this message", from: "from@someone.com", commentId: "comm38754"}) RETURN CASE WHEN c IS NOT NULL AND m IS NOT NULL THEN true ELSE false END AS ok`)
@@ -214,10 +214,10 @@ DELETE n,r
 		g.Describe("two equal (repeated) emails going to the same card", func() {
 			// this is more a bug than a feature, two equal emails from the same person should be regarded as one
 			g.It("should save a new card with two emails", func() {
-				Expect(SaveCardWithEmail("bob@boardthreads.com", "csl8484", "cid8484", "7676767")).To(Succeed())
+				Expect(SaveCardWithEmail("bob@BOARDthreads.com", "csl8484", "cid8484", "7676767")).To(Succeed())
 				Expect(SaveEmailReceived("cid8484", "csl8484", "<mid8484>", "repeated email", "from@someone.com", "comm84841")).To(Succeed())
 				Expect(SaveCardWithEmail("bob@boardthreads.com", "csl8484", "cid8484", "7676767")).To(Succeed())
-				Expect(SaveEmailReceived("cid8484", "csl8484", "<mid8484>", "repeated email", "from@someone.com", "comm84842")).To(Succeed())
+				Expect(SaveEmailReceived("cid8484", "csl8484", "<mid8484>", "repeated email", "FROM@someone.com", "comm84842")).To(Succeed())
 
 				var ok bool
 				err := DB.Get(&ok, `MATCH (e:EmailAddress {address: "bob@boardthreads.com"}) RETURN CASE WHEN count(e) = 1 THEN true ELSE false END AS ok`)

@@ -48,11 +48,13 @@ func GetUserForAddress(address string) (userId string, err error) {
 	err = DB.Get(&userId, `
 MATCH (u:User)-[:CONTROLS]->(:EmailAddress {address: {0}})
 RETURN u.id AS userId
-    `, address)
+    `, strings.ToLower(address))
 	return
 }
 
 func GetAddress(userId, emailAddress string) (*Address, error) {
+	emailAddress = strings.ToLower(emailAddress)
+
 	address := Address{}
 	err := DB.Get(&address, `
 MATCH (out)<-[s:SENDS_THROUGH]-(addr:EmailAddress {address: {0}})<-[c:CONTROLS]-()
@@ -131,6 +133,9 @@ DELETE s, t, addr, c, h, card, m, mr, cmm
 }
 
 func SetAddress(userId, boardShortLink, listId, address, outboundaddr string) (new bool, actualOutbound string, err error) {
+	address = strings.ToLower(address)
+	outboundaddr = strings.ToLower(outboundaddr)
+
 	err = DB.Get(&new, `
 OPTIONAL MATCH (oldaddress:EmailAddress {address: {3}})
 OPTIONAL MATCH (oldaddress)-[t:TARGETS]->()
@@ -300,7 +305,7 @@ func GetTargetListForEmailAddress(address string) (listId string, err error) {
 	err = DB.Get(&listId, `
 MATCH (:EmailAddress {address: {0}})-[:TARGETS]->(l:List)
 RETURN l.id AS listId
-    `, address)
+    `, strings.ToLower(address))
 	if err != nil {
 		if err.Error() != "sql: no rows in result set" {
 			// a real error
@@ -333,7 +338,7 @@ RETURN
  last,
  (TIMESTAMP() - last > 1000*60*60*24*15) AS expired // expiration: 15 days
 LIMIT 1
-    `, messageId, rawSubject, helpers.ExtractSubject(rawSubject), senderAddress)
+    `, messageId, rawSubject, helpers.ExtractSubject(rawSubject), strings.ToLower(senderAddress))
 
 	if err != nil {
 		if err.Error() != "sql: no rows in result set" {
@@ -362,7 +367,7 @@ func ListAddressesOnDomain(domainName string) (domains []string, err error) {
 	err = DB.Select(&domains, `
 MATCH (:Domain {host: {0}})-[:OWNS]->(e:EmailAddress)
   WHERE (e)<-[:SENDS_THROUGH]-()
-RETURN e.address
+RETURN LOWER(e.address)
     `, domainName)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
@@ -384,6 +389,8 @@ func SaveCardWithEmail(emailAddress, cardShortLink, cardId, webhookId string) (e
 		}).Error("missing arguments to SaveCardWithEmail")
 		return errors.New("missing arguments")
 	}
+
+	emailAddress = strings.ToLower(emailAddress)
 
 	_, err = DB.Exec(`
 MERGE (addr:EmailAddress {address: {0}})
@@ -419,7 +426,7 @@ RETURN
   m.id AS id,
   m.date AS date,
   CASE WHEN m.subject THEN m.subject ELSE '' END AS subject,
-  CASE WHEN m.from THEN m.from ELSE '' END AS from,
+  CASE WHEN m.from THEN LOWER(m.from) ELSE '' END AS from,
   m.commentId AS commentId
     `, commentId)
 	if err != nil {
@@ -441,13 +448,13 @@ MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
 WITH
  c, outbound, addr,
  reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
- collect(DISTINCT m.from) AS recipients
+ collect(DISTINCT LOWER(m.from)) AS recipients
         
 RETURN
  lastMail.id AS lastMailId,
  lastMail.subject AS lastMailSubject,
- addr.address AS inbound,
- outbound.address AS outbound,
+ LOWER(addr.address) AS inbound,
+ LOWER(outbound.address) AS outbound,
  CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
  recipients
 LIMIT 1`, shortLink)
@@ -467,7 +474,7 @@ MERGE (c)-[:CONTAINS]->(m)
 
 WITH c
   SET c.id = {5}
-`, cardShortLink, messageId, subject, from, commentId, cardId)
+`, cardShortLink, messageId, subject, strings.ToLower(from), commentId, cardId)
 	return
 }
 

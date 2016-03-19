@@ -16,7 +16,7 @@ func TestDB(t *testing.T) {
 	g := Goblin(t)
 	RegisterFailHandler(func(m string, _ ...int) { g.Fail(m) })
 
-	g.Describe("db basic", func() {
+	g.Describe("db", func() {
 
 		g.Before(func() {
 			DB.Exec(`
@@ -278,6 +278,7 @@ DELETE n,r
 		})
 
 		g.Describe("again, now with more complication", func() {
+
 			g.It("should setup everything", func() {
 				// three cards
 				Expect(SaveCardWithEmail("bob@boardthreads.com", "csl9696", "cid9696", "7676767")).To(Succeed())
@@ -326,6 +327,60 @@ DELETE n,r
 				DB.Select(&ids, `MATCH (c:Card {id: "cid9797"})--(m:Mail) RETURN m.id ORDER BY m.id`)
 				Expect(ids).To(BeEquivalentTo([]string{"<mid991>", "<mid992>", "<mid99>", "<replwew4>"}))
 			})
+		})
+
+		g.Describe("custom params", func() {
+
+			g.It("fetch default params for a card", func() {
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
+					LastMailId:      "<mid992>",
+					LastMailSubject: "it is complicated",
+					InboundAddr:     "maria@boardthreads.com",
+					OutboundAddr:    "maria@boardthreads.com",
+					ReplyTo:         "maria@boardthreads.com",
+					Recipients:      []string{"from@someone.com"},
+					AddReplier:      false,
+					SenderName:      "",
+				}))
+			})
+
+			g.It("should set some params then fetch again", func() {
+				Expect(SetAddrParams("maria", "maria@boardthreads.com", map[string]interface{}{
+					"ReplyTo":    "cuisine@maria.com",
+					"SenderName": "Marie",
+					"AddReplier": true,
+				})).To(Succeed())
+
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
+					LastMailId:      "<mid992>",
+					LastMailSubject: "it is complicated",
+					InboundAddr:     "maria@boardthreads.com",
+					OutboundAddr:    "maria@boardthreads.com",
+					ReplyTo:         "cuisine@maria.com",
+					Recipients:      []string{"from@someone.com"},
+					AddReplier:      true,
+					SenderName:      "Marie",
+				}))
+			})
+
+			g.It("set some params and unset others, then fetch", func() {
+				Expect(SetAddrParams("maria", "maria@boardthreads.com", map[string]interface{}{
+					"SenderName": "Mariah",
+					"AddReplier": false,
+				})).To(Succeed())
+
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
+					LastMailId:      "<mid992>",
+					LastMailSubject: "it is complicated",
+					InboundAddr:     "maria@boardthreads.com",
+					OutboundAddr:    "maria@boardthreads.com",
+					ReplyTo:         "cuisine@maria.com",
+					Recipients:      []string{"from@someone.com"},
+					AddReplier:      false,
+					SenderName:      "Mariah",
+				}))
+			})
+
 		})
 	})
 }

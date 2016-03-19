@@ -62,4 +62,6 @@ type emailParams struct {
 	OutboundAddr    string   `db:"outbound"`
 	ReplyTo         string   `db:"replyTo"`
 	Recipients      []string `db:"recipients"`
+	AddReplier      bool     `db:"addReplier"`
+	SenderName      string   `db:"senderName"`
 }

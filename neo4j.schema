@@ -8,6 +8,7 @@
   replyTo, /* when there's an address somewhere that redirects to inboundaddr, this
               can be set for plastic reasons. disabled when MX records are set */
   senderName, /* also for plastic reasons, the "Name" in "Name <address@email.com>" */
+  addReplier, /* configuration option for adding the replier to the cards to which he replies */
 })
 (:Domain {host})
 (:Mail {id, date, subject, from, commentId})

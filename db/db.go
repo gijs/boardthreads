@@ -3,6 +3,7 @@ package db
 import (
 	"bt/helpers"
 	"errors"
+	"fmt"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -268,6 +269,32 @@ MERGE (o)<-[:SENDS_THROUGH]-(e)
 	return
 }
 
+func SetAddrParams(userId, address string, params map[string]interface{}) error {
+	address = strings.ToLower(address)
+	values := []interface{}{userId, address}
+
+	i := 2
+	statement := "MATCH (addr:EmailAddress {address: {1}})<-[:CONTROLS]-(user:User {id: {0}})"
+	if val, ok := params["ReplyTo"]; ok {
+		statement += fmt.Sprintf(" SET addr.replyTo = {%d}", i)
+		values = append(values, val)
+		i++
+	}
+	if val, ok := params["SenderName"]; ok {
+		statement += fmt.Sprintf(" SET addr.senderName = {%d}", i)
+		values = append(values, val)
+		i++
+	}
+	if val, ok := params["AddReplier"]; ok {
+		statement += fmt.Sprintf(" SET addr.addReplier = %t", val)
+	}
+
+	statement += " RETURN user.id" // just to fail when "no rows..."
+	var tmp string
+	err := DB.Get(&tmp, statement, values...)
+	return err
+}
+
 func MaybeReleaseDomainFromOwner(domainName string) error {
 	_, err := DB.Exec(`
 MATCH (d:Domain {host: {0}})
@@ -441,7 +468,8 @@ RETURN
 
 func GetEmailParamsForCard(shortLink string) (params emailParams, err error) {
 	err = DB.Get(&params, `
-MATCH (c:Card {shortLink: {0}})--(addr:EmailAddress)
+MATCH (c:Card) WHERE c.shortLink = {0} OR c.id = {0}
+MATCH (c)--(addr:EmailAddress)
 MATCH (outbound:EmailAddress)<-[:SENDS_THROUGH]-(addr)
 MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
 
@@ -456,6 +484,8 @@ RETURN
  LOWER(addr.address) AS inbound,
  LOWER(outbound.address) AS outbound,
  CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
+ CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
+ CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier,
  recipients
 LIMIT 1`, shortLink)
 	return

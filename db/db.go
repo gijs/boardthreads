@@ -396,6 +396,30 @@ RETURN LOWER(e.address)
 	return domains, nil
 }
 
+func LastMessagesForUser(userId string, quantity int) (messages []Email, err error) {
+	messages = make([]Email, 0)
+	err = DB.Select(&messages, `
+MATCH (u:User {id: {0}})--(e:EmailAddress)--(c:Card)--(m:Mail)
+RETURN
+  e.address AS address,
+  c.shortLink AS cardShortLink,
+  CASE WHEN m.id IS NOT NULL THEN m.id ELSE "" END AS id,
+  CASE WHEN m.from IS NOT NULL THEN m.from ELSE "" END AS from,
+  CASE WHEN m.subject IS NOT NULL THEN m.subject ELSE "" END AS subject,
+  CASE WHEN m.commentId IS NOT NULL THEN m.commentId ELSE "" END AS commentId,
+  m.date AS date
+ORDER BY m.date DESC LIMIT {1}
+    `, userId, quantity)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return messages, nil
+		} else {
+			return nil, err
+		}
+	}
+	return messages, nil
+}
+
 func SaveCardWithEmail(emailAddress, cardShortLink, cardId, webhookId string) (err error) {
 	if cardShortLink == "" || cardId == "" || webhookId == "" {
 		log.WithFields(log.Fields{

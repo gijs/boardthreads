@@ -1,11 +1,9 @@
 package db
 
 import (
-	"log"
 	"testing"
 
 	. "github.com/franela/goblin"
-	"github.com/kr/pretty"
 	. "github.com/onsi/gomega"
 )
 
@@ -142,9 +140,6 @@ DELETE n,r
 				_, _, err := SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
 				Expect(err).ToNot(HaveOccurred())
 				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
-				log.Print("aaaaaaaaaaaaaaaaaaaaa")
-				pretty.Log(addr)
-				log.Print("aaaaaaaaaaaaaaaaaaaaa")
 				Expect(addr.Status).To(Equal(TRIAL))
 
 				Expect(SavePaypalProfileId("gorilla", "gorilla-support@boardthreads.com", "pay33746")).To(Succeed())
@@ -332,6 +327,34 @@ DELETE n,r
 				var ids []string
 				DB.Select(&ids, `MATCH (c:Card {id: "cid9797"})--(m:Mail) RETURN m.id ORDER BY m.id`)
 				Expect(ids).To(BeEquivalentTo([]string{"<mid991>", "<mid992>", "<mid99>", "<replwew4>"}))
+			})
+		})
+
+		g.Describe("account info", func() {
+
+			g.It("fetch last messages for user", func() {
+				messages, err := LastMessagesForUser("bob", 20)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(messages).To(HaveLen(0))
+
+				messages, err = LastMessagesForUser("maria", 3)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(messages).To(HaveLen(3))
+
+				m := messages[0]
+
+				messages, err = LastMessagesForUser("maria", 20)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(messages).To(HaveLen(6))
+
+				Expect(m.CommentId).To(Equal(messages[0].CommentId))
+				Expect(messages[0].Id).To(Equal("<replwew4>"))
+				Expect(messages[4].Address).To(Equal("maria-support@boardthreads.com"))
+				Expect(messages[5].Address).To(Equal("maria@boardthreads.com"))
+
+				messages, err = LastMessagesForUser("no-one", 20)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(messages).To(HaveLen(0))
 			})
 		})
 

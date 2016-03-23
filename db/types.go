@@ -3,12 +3,11 @@ package db
 import (
 	"bt/mailgun"
 	"time"
-
-	"gopkg.in/cq.v1/types"
 )
 
 type Account struct {
-	Addresses []Address `json:"addresses"`
+	LastMessages []Email   `json:"lastMessages"`
+	Addresses    []Address `json:"addresses"`
 }
 
 type addressStatus string
@@ -67,11 +66,17 @@ type AddressSettings struct {
 }
 
 type Email struct {
-	Id        string         `json:"id"        db:"id"`
-	Date      types.NullTime `json:"date"      db:"date"`
-	Subject   string         `json:"subject"   db:"subject"`
-	From      string         `json:"from"      db:"from"`
-	CommentId string         `json:"commentId" db:"commentId"`
+	Id            string `json:"id"            db:"id"`
+	Date          int64  `json:"-"             db:"date"`
+	Subject       string `json:"subject"       db:"subject"`
+	From          string `json:"from"          db:"from"`
+	CommentId     string `json:"commentId"     db:"commentId"`
+	Address       string `json:"address"       db:"address"`
+	CardShortLink string `json:"cardShortLink" db:"cardShortLink"`
+}
+
+func (email *Email) Time() time.Time {
+	return time.Unix(email.Date/1000, 0)
 }
 
 type emailParams struct {

@@ -98,20 +98,29 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 	// get addresses
 	addresses, err := db.GetAddresses(userId)
 	if err != nil {
-		logger.WithFields(log.Fields{"err": err, "user": userId}).Warn("error fetching addresses")
+		logger.WithFields(log.Fields{"err": err, "user": userId}).Error("error fetching addresses")
 		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
 
-	// making sure addresses is not nil
+	// get last messages
+	messages, err := db.LastMessagesForUser(userId, 20)
+	if err != nil {
+		logger.WithFields(log.Fields{"err": err, "user": userId}).Warn("error fetching lastmessages")
+		reportError(raygun, err, logger)
+		return
+	}
+
+	// making sure arrays are not null
 	if addresses == nil {
 		addresses = make([]db.Address, 0)
 	}
 
 	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(db.Account{
-		Addresses: addresses,
+		Addresses:    addresses,
+		LastMessages: messages,
 	})
 }
 

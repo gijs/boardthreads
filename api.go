@@ -296,6 +296,37 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
+
+	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
+	vars := mux.Vars(r)
+
+	address := vars["address"] + "@" + settings.BaseDomain
+
+	var params db.AddressSettings
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 400, logger)
+		return
+	}
+
+	logger.WithFields(log.Fields{
+		"address": address,
+		"user":    userId,
+		"params":  params,
+	}).Info("changing settings")
+
+	err = db.ChangeAddressSettings(userId, address, params)
+	if err != nil {
+		reportError(raygun, err, logger)
+		sendJSONError(w, err, 400, logger)
+		return
+	}
+}
+
 func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})

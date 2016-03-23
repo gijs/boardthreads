@@ -34,30 +34,88 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 	cardId := strings.Trim(r.PostFormValue("card"), `"`)
-	commenterId := strings.Trim(r.PostFormValue("commenter"), `"`)
+
+	params, err := db.GetEmailParamsForCard(cardId)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"card": cardId,
+			"err":  err.Error(),
+		}).Warn("couldn't fetch mail params after mail success")
+		reportError(raygun, err, logger)
+		return
+	}
+
+	logger.WithFields(log.Fields{
+		"card":       cardId,
+		"addReplier": params.AddReplier,
+	}).Info("mailgun success")
+
+	if params.AddReplier {
+		card, err := trello.Client.Card(cardId)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"card": cardId,
+				"err":  err.Error(),
+			}).Warn("couldn't fetch card after mail success")
+			reportError(raygun, err, logger)
+			return
+		}
+
+		commenterId := strings.Trim(r.PostFormValue("commenter"), `"`)
+
+		card.AddMemberId(commenterId)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"card":    cardId,
+				"replier": commenterId,
+				"err":     err.Error(),
+			}).Warn("couldn't add replier to card.")
+			reportError(raygun, err, logger)
+		}
+	}
+}
+
+func MailgunFailure(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+
+	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
+	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
+
+	cardId := strings.Trim(r.FormValue("card"), `"`)
+	log.Print("cardId: ", cardId)
 
 	card, err := trello.Client.Card(cardId)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"card": cardId,
 			"err":  err.Error(),
-		}).Warn("couldn't fetch card after mail success")
+		}).Error("couldn't fetch card after mail failure")
 		reportError(raygun, err, logger)
 		return
 	}
 
-	card.AddMemberId(commenterId)
+	logger.WithFields(log.Fields{
+		"card":      cardId,
+		"recipient": r.FormValue("recipient"),
+	}).Warn("mailgun failure")
+
+	notice := fmt.Sprintf("**mail could not be delivered to %s**\n\n---\n\n%s", r.FormValue("recipient"), r.FormValue("description"))
+
+	_, err = card.AddComment(notice)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"card":    cardId,
-			"replier": commenterId,
-			"err":     err.Error(),
-		}).Warn("couldn't add replier to card.")
+			"card":   cardId,
+			"notice": notice,
+			"err":    err.Error(),
+		}).Error("couldn't add mailgun failure notice to card.")
 		reportError(raygun, err, logger)
 	}
-}
 
-func MailgunFailure(w http.ResponseWriter, r *http.Request) {}
+	logger.WithFields(log.Fields{
+		"card":      cardId,
+		"recipient": r.PostFormValue("recipient"),
+	}).Debug("posted notice to the card")
+}
 
 func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	/* parse email message
@@ -82,6 +140,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	logger.WithFields(log.Fields{
 		"recipient": inboundAddr,
+		"sender":    r.PostFormValue("sender"),
 		"url":       url,
 	}).Info("got mail")
 
@@ -198,7 +257,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// if something fails during the card creation process `card` will be nil
 	// now upload attachments
-	logger.WithFields(log.Fields{"quantity": len(message.Attachments)}).Info("uploading attachments")
+	logger.WithFields(log.Fields{"quantity": len(message.Attachments)}).Debug("uploading attachments")
 	dir := filepath.Join("/tmp", "bt", message.From, message.Subject)
 	os.MkdirAll(dir, 0777)
 	attachmentUrls := make(map[string]string)
@@ -286,7 +345,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// post the message as comment
-	logger.WithFields(log.Fields{"card": card.ShortLink}).Info("posting comment")
+	logger.WithFields(log.Fields{"card": card.ShortLink}).Debug("posting comment")
 	prefix := fmt.Sprintf("[:envelope_with_arrow:](%s)", attachedBody.Url)
 	commentText := fmt.Sprintf("%s %s:\n\n> %s",
 		prefix,
@@ -346,7 +405,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 }
 
 func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
-	log.Info("a Trello webhook was created.")
+	log.Debug("a Trello webhook was created.")
 	w.WriteHeader(200)
 }
 

@@ -20,24 +20,37 @@ const (
 )
 
 type Address struct {
-	Start           int64           `json:"-"                db:"date"`
-	UserId          string          `json:"-"                db:"userId"`
-	BoardShortLink  string          `json:"boardShortLink"   db:"boardShortLink"`
-	ListId          string          `json:"listId"           db:"listId"`
-	InboundAddr     string          `json:"inboundaddr"      db:"inboundaddr"`
-	OutboundAddr    string          `json:"outboundaddr"     db:"outboundaddr"`
-	RouteId         string          `json:"-"                db:"routeId"`
-	DomainName      string          `json:"-"                db:"domain"`
-	DomainStatus    *mailgun.Domain `json:"domain,omitempty"`
-	PaypalProfileId string          `json:"-"                db:"paypalProfileId"`
-	Status          addressStatus   `json:"status"`
+	Start             int64           `json:"-"                db:"date"`
+	UserId            string          `json:"-"                db:"userId"`
+	BoardShortLink    string          `json:"boardShortLink"   db:"boardShortLink"`
+	ListId            string          `json:"listId"           db:"listId"`
+	InboundAddr       string          `json:"inboundaddr"      db:"inboundaddr"`
+	OutboundAddr      string          `json:"outboundaddr"     db:"outboundaddr"`
+	RouteId           string          `json:"-"                db:"routeId"`
+	DomainName        string          `json:"-"                db:"domain"`
+	DomainStatus      *mailgun.Domain `json:"domain,omitempty"`
+	PaypalProfileId   string          `json:"-"                db:"paypalProfileId"`
+	Status            addressStatus   `json:"status"`
+	SenderNameSetting string          `json:"-"                              db:"senderName"`
+	ReplyToSetting    string          `json:"-"                              db:"replyTo"`
+	AddReplierSetting bool            `json:"-"                              db:"addReplier"`
+	Settings          AddressSettings `json:"settings"`
 }
 
 func (addr *Address) StartTime() time.Time {
 	return time.Unix(addr.Start/1000, 0)
 }
 
-func (addr *Address) SetStatus() {
+func (addr *Address) PostProcess() {
+	// organize settings
+	addr.Settings.SenderName = addr.SenderNameSetting
+	addr.Settings.ReplyTo = addr.ReplyToSetting
+	addr.Settings.AddReplier = addr.AddReplierSetting
+	addr.SenderNameSetting = ""
+	addr.ReplyToSetting = ""
+	addr.AddReplierSetting = false
+
+	// status
 	if addr.PaypalProfileId != "" {
 		addr.Status = VALID
 	} else if time.Since(addr.StartTime()).Hours() > 1488 {
@@ -45,6 +58,12 @@ func (addr *Address) SetStatus() {
 	} else {
 		addr.Status = TRIAL
 	}
+}
+
+type AddressSettings struct {
+	SenderName string `json:"senderName"`
+	ReplyTo    string `json:"replyTo"`
+	AddReplier bool   `json:"addReplier"`
 }
 
 type Email struct {

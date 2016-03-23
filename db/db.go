@@ -3,7 +3,6 @@ package db
 import (
 	"bt/helpers"
 	"errors"
-	"fmt"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -69,7 +68,10 @@ RETURN
   CASE WHEN out.address IS NOT NULL THEN out.address ELSE addr.address END AS outboundaddr,
   CASE WHEN d.host IS NOT NULL THEN d.host ELSE "" END AS domain,
   CASE WHEN sends.routeId IS NOT NULL THEN sends.routeId ELSE "" END AS routeId,
-  CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId
+  CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId,
+  CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
+  CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
+  CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier
 LIMIT 1
 `, emailAddress, userId)
 	if err != nil {
@@ -84,7 +86,7 @@ LIMIT 1
 
 	// post processing
 	address.UserId = userId
-	address.SetStatus()
+	address.PostProcess()
 
 	return &address, nil
 }
@@ -115,7 +117,7 @@ ORDER BY date
 	// post processing
 	for i := range addresses {
 		addresses[i].UserId = userId
-		addresses[i].SetStatus()
+		addresses[i].PostProcess()
 	}
 
 	return
@@ -269,29 +271,17 @@ MERGE (o)<-[:SENDS_THROUGH]-(e)
 	return
 }
 
-func SetAddrParams(userId, address string, params map[string]interface{}) error {
+func ChangeAddressSettings(userId, address string, params AddressSettings) error {
 	address = strings.ToLower(address)
-	values := []interface{}{userId, address}
 
-	i := 2
-	statement := "MATCH (addr:EmailAddress {address: {1}})<-[:CONTROLS]-(user:User {id: {0}})"
-	if val, ok := params["ReplyTo"]; ok {
-		statement += fmt.Sprintf(" SET addr.replyTo = {%d}", i)
-		values = append(values, val)
-		i++
-	}
-	if val, ok := params["SenderName"]; ok {
-		statement += fmt.Sprintf(" SET addr.senderName = {%d}", i)
-		values = append(values, val)
-		i++
-	}
-	if val, ok := params["AddReplier"]; ok {
-		statement += fmt.Sprintf(" SET addr.addReplier = %t", val)
-	}
-
-	statement += " RETURN user.id" // just to fail when "no rows..."
 	var tmp string
-	err := DB.Get(&tmp, statement, values...)
+	err := DB.Get(&tmp, `
+MATCH (addr:EmailAddress {address: {1}})<-[:CONTROLS]-(user:User {id: {0}})
+SET addr.replyTo = {2}
+SET addr.senderName = {3}
+SET addr.addReplier = {4}
+RETURN user.id // just to fail when "no rows..."
+    `, userId, address, params.ReplyTo, params.SenderName, params.AddReplier)
 	return err
 }
 

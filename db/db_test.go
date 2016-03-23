@@ -1,9 +1,11 @@
 package db
 
 import (
+	"log"
 	"testing"
 
 	. "github.com/franela/goblin"
+	"github.com/kr/pretty"
 	. "github.com/onsi/gomega"
 )
 
@@ -48,11 +50,12 @@ DELETE n,r
 		g.It("should get that address", func() {
 			addr, err := GetAddress("maria", "maria@boardthreads.com")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 			Expect(addr.UserId).To(Equal("maria"))
 			Expect(addr.ListId).To(Equal("l43834"))
 			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
 			Expect(addr.OutboundAddr).To(Equal("maria@boardthreads.com"))
+			addr.Settings.ReplyTo = "" // GetAddress returns this, GetAddresses don't
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 		})
 
 		g.It("should change the target list", func() {
@@ -61,11 +64,12 @@ DELETE n,r
 
 			addr, err := GetAddress("maria", "maria@boardthreads.com")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 			Expect(addr.UserId).To(Equal("maria"))
 			Expect(addr.ListId).To(Equal("l49983"))
 			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
 			Expect(addr.OutboundAddr).To(Equal("maria@boardthreads.com"))
+			addr.Settings.ReplyTo = "" // GetAddress returns this, GetAddresses don't
+			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 		})
 
 		g.It("should change the outboundaddr", func() {
@@ -81,7 +85,8 @@ DELETE n,r
 			Expect(addr.InboundAddr).To(Equal("maria@boardthreads.com"))
 			Expect(addr.OutboundAddr).To(Equal("help@maria.com"))
 			Expect(addr.DomainName).To(Equal("maria.com"))
-			addr.DomainName = "" // GetAddress returns this, GetAddresses don't
+			addr.DomainName = ""       // GetAddress returns this, GetAddresses don't
+			addr.Settings.ReplyTo = "" // GetAddress returns this, GetAddresses don't
 			Expect(GetAddresses("maria")).To(BeEquivalentTo([]Address{*addr}))
 		})
 
@@ -134,16 +139,18 @@ DELETE n,r
 		g.Describe("billing", func() {
 
 			g.It("should create an address with billing", func() {
-				SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
+				_, _, err := SetAddress("gorilla", "b96847", "l497814", "gorilla-support@boardthreads.com", "support@gorilla.com")
+				Expect(err).ToNot(HaveOccurred())
 				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
-				addr.SetStatus()
+				log.Print("aaaaaaaaaaaaaaaaaaaaa")
+				pretty.Log(addr)
+				log.Print("aaaaaaaaaaaaaaaaaaaaa")
 				Expect(addr.Status).To(Equal(TRIAL))
 
 				Expect(SavePaypalProfileId("gorilla", "gorilla-support@boardthreads.com", "pay33746")).To(Succeed())
 
 				addr, _ = GetAddress("gorilla", "gorilla-support@boardthreads.com")
 				Expect(addr.PaypalProfileId).To(Equal("pay33746"))
-				addr.SetStatus()
 				Expect(addr.Status).To(Equal(VALID))
 			})
 
@@ -151,7 +158,6 @@ DELETE n,r
 				Expect(RemovePaypalProfileId("gorilla-support@boardthreads.com")).To(Succeed())
 
 				addr, _ := GetAddress("gorilla", "gorilla-support@boardthreads.com")
-				addr.SetStatus()
 				Expect(addr.PaypalProfileId).To(Equal(""))
 				Expect(addr.Status).To(Equal(TRIAL))
 			})
@@ -345,10 +351,10 @@ DELETE n,r
 			})
 
 			g.It("should set some params then fetch again", func() {
-				Expect(SetAddrParams("maria", "maria@boardthreads.com", map[string]interface{}{
-					"ReplyTo":    "cuisine@maria.com",
-					"SenderName": "Marie",
-					"AddReplier": true,
+				Expect(ChangeAddressSettings("maria", "maria@boardthreads.com", AddressSettings{
+					ReplyTo:    "cuisine@maria.com",
+					SenderName: "Marie",
+					AddReplier: true,
 				})).To(Succeed())
 
 				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
@@ -361,12 +367,17 @@ DELETE n,r
 					AddReplier:      true,
 					SenderName:      "Marie",
 				}))
+
+				addr, _ := GetAddress("maria", "maria@boardthreads.com")
+				Expect(addr.Settings).To(BeEquivalentTo(AddressSettings{"Marie", "cuisine@maria.com", true}))
 			})
 
 			g.It("set some params and unset others, then fetch", func() {
-				Expect(SetAddrParams("maria", "maria@boardthreads.com", map[string]interface{}{
-					"SenderName": "Mariah",
-					"AddReplier": false,
+				Expect(ChangeAddressSettings("maria", "maria@boardthreads.com", AddressSettings{
+					SenderName: "Mariah",
+					AddReplier: false,
+					ReplyTo:    "cuisine@maria.com", // all params must be set again everytime,
+					// otherwise they are replaced with default values
 				})).To(Succeed())
 
 				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
@@ -379,6 +390,9 @@ DELETE n,r
 					AddReplier:      false,
 					SenderName:      "Mariah",
 				}))
+
+				addr, _ := GetAddress("maria", "maria@boardthreads.com")
+				Expect(addr.Settings).To(BeEquivalentTo(AddressSettings{"Mariah", "cuisine@maria.com", false}))
 			})
 
 		})

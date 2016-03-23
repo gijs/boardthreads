@@ -10,9 +10,10 @@ import (
 )
 
 type Settings struct {
-	ApiKey     string `envconfig:"MAILGUN_API_KEY"`
-	BaseDomain string `envconfig:"BASE_DOMAIN"`
-	Secret     string `envconfig:"SESSION_SECRET"`
+	ApiKey         string `envconfig:"MAILGUN_API_KEY"`
+	BaseDomain     string `envconfig:"BASE_DOMAIN"`
+	WebhookHandler string `envconfig:"WEBHOOK_HANDLER"`
+	Secret         string `envconfig:"SESSION_SECRET"`
 }
 
 var Client mailgun.Mailgun
@@ -91,6 +92,11 @@ func PrepareExternalAddress(inbound, outbound string) (routeId string, err error
 		}
 	}
 
+	// create webhooks for bounce and success
+	Client.CreateWebhook("deliver", settings.WebhookHandler+"/webhooks/mailgun/success")
+	Client.CreateWebhook("bounce", settings.WebhookHandler+"/webhooks/mailgun/failure")
+	// for now we don't care about the result
+
 	route, err := Client.CreateRoute(mailgun.Route{
 		Priority:    64,
 		Description: "External inbound address.",
@@ -134,7 +140,8 @@ func ExtractDNS(domain string, records []mailgun.DNSRecord) *DNS {
 				s.DomainKey = DNSRecord{"TXT", dns.Name, dns.Value, "", isValid(dns.Valid)}
 			}
 		} else if dns.RecordType == "MX" {
-			s.Receive = append(s.Receive, DNSRecord{"MX", "", dns.Value, dns.Priority, isValid(dns.Valid)})
+			v := strings.Replace(dns.Value, "mailgun.org", "boardthreads.com", 1)
+			s.Receive = append(s.Receive, DNSRecord{"MX", "", v, dns.Priority, isValid(dns.Valid)})
 		}
 	}
 	return &s

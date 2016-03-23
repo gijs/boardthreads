@@ -1,6 +1,7 @@
 package mailgun
 
 import (
+	"fmt"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -36,7 +37,11 @@ func Send(params NewMessage) (messageId string, err error) {
 		localClient = mailgun.NewMailgun(params.Domain, settings.ApiKey, "")
 	}
 
-	message := localClient.NewMessage(params.From, params.Subject, params.Text, params.Recipients...)
+	from := params.From
+	if params.FromName != "" {
+		from = fmt.Sprintf("%s <%s>", params.FromName, params.From)
+	}
+	message := localClient.NewMessage(from, params.Subject, params.Text, params.Recipients...)
 	if params.HTML != "" {
 		params.HTML = string(gfm.Markdown([]byte(params.Text)))
 	}

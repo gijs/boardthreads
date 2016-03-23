@@ -532,6 +532,7 @@ sendMail:
 		HTML:          string(gfm.Markdown([]byte(strippedText))),
 		Text:          strippedText,
 		Recipients:    params.Recipients,
+		FromName:      params.SenderName,
 		From:          sendingAddr,
 		Domain:        strings.Split(sendingAddr, "@")[1],
 		Subject:       helpers.ExtractSubject(params.LastMailSubject),

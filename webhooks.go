@@ -7,6 +7,7 @@ import (
 	"bt/mailgun"
 	"bt/trello"
 	"errors"
+	"math/rand"
 
 	"encoding/json"
 	"fmt"
@@ -267,9 +268,30 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			filedst := filepath.Join(dir, mailAttachment.Name)
 			err = helpers.DownloadFile(filedst, mailAttachment.Url, "api", settings.MailgunAPIKey)
 			if err != nil {
-				logger.Warn("download of " + mailAttachment.Url + " failed: " + err.Error())
+				logger.WithFields(log.Fields{
+					"url":  mailAttachment.Url,
+					"path": filedst,
+					"err":  err.Error(),
+					"card": card.ShortLink,
+				}).Warn("attachment download failed")
 				reportError(raygun, err, logger)
-				continue
+
+				// if fail because target is a directory do something!
+				if strings.Contains(err.Error(), "is a directory") {
+					filedst = filepath.Join("/tmp/", randStringBytesMaskImprSrc(rand.NewSource(time.Now().UnixNano()), 6))
+					err = helpers.DownloadFile(filedst, mailAttachment.Url, "api", settings.MailgunAPIKey)
+					if err != nil {
+						logger.WithFields(log.Fields{
+							"url":  mailAttachment.Url,
+							"path": filedst,
+							"err":  err.Error(),
+							"card": card.ShortLink,
+						}).Warn("attachment download failed for the second time")
+						continue
+					}
+				} else {
+					continue
+				}
 			}
 
 			// before uploading, check if file is already on this trello card
@@ -278,7 +300,11 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			} else {
 				trelloAttachment, err := card.UploadAttachment(filedst)
 				if err != nil {
-					logger.Warn("upload of " + mailAttachment.Url + " failed: " + err.Error())
+					logger.WithFields(log.Fields{
+						"path": filedst,
+						"err":  err.Error(),
+						"card": card.ShortLink,
+					}).Warn("attachment upload failed")
 					reportError(raygun, err, logger)
 					continue
 				}

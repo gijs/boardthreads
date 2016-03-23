@@ -28,7 +28,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 		err = errors.New(userId + " doesn't own " + emailAddress + " because " + addressOwnerId + " does")
 	}
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"err":     err.Error(),
 			"address": emailAddress,
 			"userId":  userId,
@@ -50,7 +50,7 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 		settings.ServiceURL+failureURL.String(),
 	)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"err":     err.Error(),
 			"userId":  userId,
 			"address": emailAddress,
@@ -111,7 +111,7 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 
 	profileId, err := paypal.CreateSubscription(userId, emailAddress, token, payerId)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"err":     err.Error(),
 			"userId":  userId,
 			"address": emailAddress,
@@ -124,7 +124,7 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 
 	err = db.SavePaypalProfileId(userId, emailAddress, profileId)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"err":       err.Error(),
 			"userId":    userId,
 			"address":   emailAddress,

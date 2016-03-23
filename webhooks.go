@@ -489,9 +489,13 @@ sendMail:
 		}).Warn("no card found in our database for this comment. will ignore it and cancel the webhook.")
 
 		// post a comment on the card telling about the error
-		card, err := trello.Client.Card(wh.Action.Data.Card.ShortLink)
+		card, perr := trello.Client.Card(wh.Action.Data.Card.ShortLink)
+		if perr == nil {
+			_, perr = card.AddComment("Due to a misterious error, replies in this card can't be send. Please report this issue.")
+		}
+
 		if err == nil {
-			card.AddComment("Due to a misterious error, replies in this card cannot be sent. Please report this issue.")
+			err = perr
 		}
 
 		reportError(raygun, err, logger)

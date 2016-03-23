@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/auth0/go-jwt-middleware"
 	"github.com/carbocation/interpose"
@@ -27,7 +26,6 @@ type Settings struct {
 	BaseDomain     string `envconfig:"BASE_DOMAIN"`
 	DashboardURL   string `envconfig:"DASHBOARD_URL"`
 	SessionSecret  string `envconfig:"SESSION_SECRET"`
-	RaygunAPIKey   string `envconfig:"RAYGUN_API_KEY"`
 	MailgunAPIKey  string `envconfig:"MAILGUN_API_KEY"`
 	TrelloBotId    string `envconfig:"TRELLO_BOT_ID"`
 	SegmentioKey   string `envconfig:"SEGMENTIO_WRITE_KEY"`
@@ -133,13 +131,6 @@ func main() {
 
 	<-stop
 	log.Print("Exiting...")
-}
-
-func reportError(raygun *raygun4go.Client, err error, logger *log.Entry) {
-	logger.WithFields(log.Fields{"err": err.Error()}).Error("reportError")
-	if raygun != nil {
-		raygun.CreateError(err.Error())
-	}
 }
 
 func sendJSONError(w http.ResponseWriter, err error, code int, logger *log.Entry) {

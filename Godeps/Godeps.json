@@ -3,15 +3,6 @@
 	"GoVersion": "go1.4.2",
 	"Deps": [
 		{
-			"ImportPath": "code.google.com/p/go-uuid/uuid",
-			"Comment": "null-15",
-			"Rev": "'35bc42037350f0078e3c974c6ea690f1926603ab'"
-		},
-		{
-			"ImportPath": "github.com/MindscapeHQ/raygun4go",
-			"Rev": "64c390247031952f6e8d6153c620f41c064a03ee"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.8.7-49-gcdaedc6",
 			"Rev": "cdaedc68f2894175ac2b3221869685602c759e71"
@@ -60,10 +51,6 @@
 			"ImportPath": "github.com/jmoiron/sqlx",
 			"Comment": "sqlx-v1.1",
 			"Rev": "69738bd209812c5a381786011aff17944a384554"
-		},
-		{
-			"ImportPath": "github.com/kaeuferportal/stack2struct",
-			"Rev": "6838fbadc9188e5d5778b0c708da95d90653bda0"
 		},
 		{
 			"ImportPath": "github.com/kalafut/imohash",

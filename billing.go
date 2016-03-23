@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
@@ -16,7 +15,6 @@ import (
 )
 
 func UpgradeList(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
@@ -34,7 +32,6 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"userId":  userId,
 			"ownerId": addressOwnerId,
 		}).Error("couldn't verify user ownership of this address")
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 403, logger)
 		return
 	}
@@ -56,7 +53,6 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 			"address": emailAddress,
 			"stderr":  paypalPayURL,
 		}).Error("couldn't get paypal auth url")
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -75,7 +71,6 @@ func UpgradeList(w http.ResponseWriter, r *http.Request) {
 }
 
 func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
@@ -83,14 +78,12 @@ func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
 
 	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
 
 	err = MaybeDowngradeAddress(address)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 	}
 
@@ -98,7 +91,6 @@ func DowngradeAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
 	vars := mux.Vars(r)
@@ -117,7 +109,6 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 			"address": emailAddress,
 			"stderr":  profileId,
 		}).Error("couldn't create subscription on paypal")
-		reportError(raygun, err, logger)
 		http.Redirect(w, r, settings.DashboardURL+"#error=Couldn't create your subscription for some reason, please contact us.", http.StatusFound)
 		return
 	}
@@ -130,7 +121,6 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 			"address":   emailAddress,
 			"profileId": profileId,
 		}).Error("couldn't save paypal subscription on db")
-		reportError(raygun, err, logger)
 		http.Redirect(w, r, settings.DashboardURL+"#error=We have created your subscription, but due to an horrible error on our systems your list status couldn't be upgraded. Please contact us immediately and inform this number: "+profileId, http.StatusFound)
 		return
 	}

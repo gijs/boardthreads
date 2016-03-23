@@ -8,7 +8,6 @@ import (
 
 	"gopkg.in/validator.v2"
 
-	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
@@ -21,7 +20,6 @@ import (
 )
 
 func SetSession(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
 	decoder := json.NewDecoder(r.Body)
@@ -30,7 +28,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	}
 	err := decoder.Decode(&data)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -38,7 +35,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	// who is this user in Trello?
 	user, err := trello.UserFromToken(data.TrelloToken)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -49,7 +45,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	}).Info("fetching/saving user on db")
 	new, err := db.EnsureUser(user.Id)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -62,7 +57,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 	token.Claims["exp"] = time.Now().Add(time.Second * 3600 * 24 * 365).Unix()
 	jwtString, err := token.SignedString([]byte(settings.SessionSecret))
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -87,7 +81,6 @@ func SetSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAccount(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 	/* account information
 	   for now this is just a {addresses: [...]}
@@ -99,7 +92,6 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 	addresses, err := db.GetAddresses(userId)
 	if err != nil {
 		logger.WithFields(log.Fields{"err": err, "user": userId}).Error("error fetching addresses")
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -108,7 +100,6 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 	messages, err := db.LastMessagesForUser(userId, 20)
 	if err != nil {
 		logger.WithFields(log.Fields{"err": err, "user": userId}).Warn("error fetching lastmessages")
-		reportError(raygun, err, logger)
 		return
 	}
 
@@ -125,7 +116,6 @@ func GetAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAddress(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 	/*
 	   address detailed information, includes domain status
@@ -137,7 +127,6 @@ func GetAddress(w http.ResponseWriter, r *http.Request) {
 	// address data
 	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 404, logger)
 		return
 	}
@@ -151,7 +140,6 @@ func SetAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func SetAddress(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 	/* accepts only an email address as parameter
 	       add address to db
@@ -170,7 +158,6 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -210,7 +197,6 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 			"address": data.InboundAddr,
 			"list":    data.ListId,
 		}).Error("couldn't fetch board or ensure the existence of the bot on the board")
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 502, logger)
 		return
 	}
@@ -224,7 +210,6 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	// adding address to db
 	new, actualOutbound, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.OutboundAddr)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -242,13 +227,11 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 		if err == nil && routeId != "" {
 			err = db.SaveRouteId(data.OutboundAddr, routeId)
 			if err != nil {
-				reportError(raygun, err, logger)
 			}
 		} else {
 			// if the domain could not be added to mailgun, set outboundaddr to inboundaddr
 			_, _, err := db.SetAddress(userId, board.ShortLink, data.ListId, data.InboundAddr, data.InboundAddr)
 			if err != nil {
-				reportError(raygun, err, logger)
 				sendJSONError(w, err, 500, logger)
 				return
 			}
@@ -270,7 +253,6 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 	// address data
 	newAddress, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 404, logger)
 		return
 	}
@@ -306,7 +288,6 @@ func SetAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 
 	userId := context.Get(r, "user").(*jwt.Token).Claims["id"].(string)
@@ -317,7 +298,6 @@ func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
 	var params db.AddressSettings
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -330,14 +310,12 @@ func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
 
 	err = db.ChangeAddressSettings(userId, address, params)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
 }
 
 func DeleteAddress(w http.ResponseWriter, r *http.Request) {
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 	logger := log.WithFields(log.Fields{"ip": r.RemoteAddr})
 	/* remove address from the db
 	   if there's a custom domain
@@ -354,7 +332,6 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 
 	address, err := db.GetAddress(userId, vars["address"]+"@"+settings.BaseDomain)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -362,7 +339,6 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 	// remove paypalProfileId and cancel subscription
 	err = MaybeDowngradeAddress(address)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 503, logger)
 	}
 
@@ -372,7 +348,6 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 	// actually delete
 	err = address.Delete()
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}

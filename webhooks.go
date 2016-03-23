@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MindscapeHQ/raygun4go"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/segmentio/analytics-go"
@@ -31,7 +30,6 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 
 	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	r.ParseForm()
 	cardId := strings.Trim(r.PostFormValue("card"), `"`)
@@ -42,7 +40,6 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 			"card": cardId,
 			"err":  err.Error(),
 		}).Warn("couldn't fetch mail params after mail success")
-		reportError(raygun, err, logger)
 		return
 	}
 
@@ -58,7 +55,6 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 				"card": cardId,
 				"err":  err.Error(),
 			}).Warn("couldn't fetch card after mail success")
-			reportError(raygun, err, logger)
 			return
 		}
 
@@ -71,7 +67,6 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 				"replier": commenterId,
 				"err":     err.Error(),
 			}).Warn("couldn't add replier to card.")
-			reportError(raygun, err, logger)
 		}
 	}
 }
@@ -80,7 +75,6 @@ func MailgunFailure(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 
 	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	cardId := strings.Trim(r.FormValue("card"), `"`)
 	log.Print("cardId: ", cardId)
@@ -91,7 +85,6 @@ func MailgunFailure(w http.ResponseWriter, r *http.Request) {
 			"card": cardId,
 			"err":  err.Error(),
 		}).Error("couldn't fetch card after mail failure")
-		reportError(raygun, err, logger)
 		return
 	}
 
@@ -109,7 +102,6 @@ func MailgunFailure(w http.ResponseWriter, r *http.Request) {
 			"notice": notice,
 			"err":    err.Error(),
 		}).Error("couldn't add mailgun failure notice to card.")
-		reportError(raygun, err, logger)
 	}
 
 	logger.WithFields(log.Fields{
@@ -133,7 +125,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	   post message as markdown as a comment to the card
 	*/
 	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	r.ParseForm()
 	inboundAddr := r.PostFormValue("recipient")
@@ -148,7 +139,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	// target list for this email
 	listId, err := db.GetTargetListForEmailAddress(inboundAddr)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}
@@ -165,7 +155,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	urlp := strings.Split(url, "/")
 	message, err := mailgun.Client.GetStoredMessage(urlp[len(urlp)-1])
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 503, logger)
 		return
 	}
@@ -175,27 +164,23 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		// card creation process
 		card, err := trello.CreateCardFromMessage(listId, message)
 		if err != nil {
-			reportError(raygun, err, logger)
 			sendJSONError(w, err, 503, logger)
 			return nil
 		}
 		card, err = trello.Client.Card(card.Id)
 		if err != nil {
-			reportError(raygun, err, logger)
 			sendJSONError(w, err, 503, logger)
 			return nil
 		}
 
 		webhookId, err := trello.CreateWebhook(card.Id, settings.WebhookHandler+"/webhooks/trello/card")
 		if err != nil {
-			reportError(raygun, err, logger)
 			sendJSONError(w, err, 503, logger)
 			return nil
 		}
 
 		err = db.SaveCardWithEmail(inboundAddr, card.ShortLink, card.Id, webhookId)
 		if err != nil {
-			reportError(raygun, err, logger)
 			sendJSONError(w, err, 500, logger)
 			return nil
 		}
@@ -210,7 +195,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		inboundAddr,
 	)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 404, logger)
 		return
 	}
@@ -228,7 +212,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			err = db.RemoveCard(shortLink)
 
 			if err != nil {
-				reportError(raygun, err, logger)
 				log.WithFields(log.Fields{
 					"card": shortLink,
 					"err":  err.Error(),
@@ -241,7 +224,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			// card exists on trello, revive it
 			err = trello.ReviveCard(card)
 			if err != nil {
-				reportError(raygun, err, logger)
 				sendJSONError(w, err, 503, logger)
 				return
 			}
@@ -274,7 +256,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 					"err":  err.Error(),
 					"card": card.ShortLink,
 				}).Warn("attachment download failed")
-				reportError(raygun, err, logger)
 
 				// if fail because target is a directory do something!
 				if strings.Contains(err.Error(), "is a directory") {
@@ -305,7 +286,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 						"err":  err.Error(),
 						"card": card.ShortLink,
 					}).Warn("attachment upload failed")
-					reportError(raygun, err, logger)
 					continue
 				}
 				attachmentUrls[mailAttachment.Url] = trelloAttachment.Url
@@ -348,12 +328,10 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		msgdst := filepath.Join(dir, messageFilename+"."+ext)
 		err = ioutil.WriteFile(msgdst, []byte(body), 0644)
 		if err != nil {
-			reportError(raygun, err, logger)
 			break
 		}
 		attachedBody_, err := card.UploadAttachment(msgdst)
 		if err != nil {
-			reportError(raygun, err, logger)
 			break
 		}
 		attachedBody = *attachedBody_
@@ -390,7 +368,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			"card": card.ShortLink,
 			"err":  err.Error(),
 		}).Error("couldn't post the comment")
-		reportError(raygun, err, logger)
 		return
 		// do not return an error or the webhook will retry and more cards will be created
 	}
@@ -411,7 +388,6 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			"comment": comment.Id,
 			"err":     err.Error(),
 		}).Error("couldn't save the email received")
-		reportError(raygun, err, logger)
 		return
 		// do not return an error or the webhook will retry and more cards will be created
 	}
@@ -443,14 +419,12 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	   send email
 	*/
 	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
-	raygun, _ := raygun4go.New("boardthreads", settings.RaygunAPIKey)
 
 	var wh struct {
 		Action goTrello.Action `json:"action"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&wh)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 400, logger)
 		return
 	}
@@ -481,7 +455,6 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
 		if err != nil {
 			// a real error
-			reportError(raygun, err, logger)
 			goto abort
 		} else if email.Id == "" {
 			// we couldn't find it, so let's send
@@ -524,7 +497,6 @@ sendMail:
 			err = perr
 		}
 
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 404, logger)
 		return
 	}
@@ -572,7 +544,6 @@ sendMail:
 		CommenterId:   wh.Action.MemberCreator.Id,
 	})
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 503, logger)
 		return
 	}
@@ -589,7 +560,6 @@ sendMail:
 		commentId,
 	)
 	if err != nil {
-		reportError(raygun, err, logger)
 		sendJSONError(w, err, 500, logger)
 		return
 	}

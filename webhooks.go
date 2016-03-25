@@ -132,7 +132,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	logger.WithFields(log.Fields{
 		"recipient": inboundAddr,
-		"sender":    r.PostFormValue("sender"),
+		"sender":    r.PostFormValue("from"),
 		"url":       url,
 	}).Info("got mail")
 
@@ -155,6 +155,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	urlp := strings.Split(url, "/")
 	message, err := mailgun.Client.GetStoredMessage(urlp[len(urlp)-1])
 	if err != nil {
+		logger.WithField("err", err).Warn("couldn't fetch message from mailgun")
 		sendJSONError(w, err, 503, logger)
 		return
 	}

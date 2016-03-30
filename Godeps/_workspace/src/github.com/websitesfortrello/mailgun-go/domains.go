@@ -1,9 +1,10 @@
 package mailgun
 
 import (
-	"github.com/mbanzon/simplehttp"
 	"strconv"
 	"time"
+
+	"github.com/mbanzon/simplehttp"
 )
 
 // DefaultLimit and DefaultSkip instruct the SDK to rely on Mailgun's reasonable defaults for pagination settings.
@@ -93,6 +94,16 @@ func (m *MailgunImpl) GetSingleDomain(domain string) (Domain, []DNSRecord, []DNS
 	var envelope singleDomainEnvelope
 	err := getResponseFromJSON(r, &envelope)
 	return envelope.Domain, envelope.ReceivingDNSRecords, envelope.SendingDNSRecords, err
+}
+
+// Trigger a DNS check for a domain
+// It is the same as pressing "Check DNS Records Now" on the web interface
+func (m *MailgunImpl) VerifyDomainDNS(domain string) error {
+	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + domain + "/verify")
+	r.SetClient(m.Client())
+	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	_, err := makePutRequest(r, nil)
+	return err
 }
 
 // CreateDomain instructs Mailgun to create a new domain for your account.

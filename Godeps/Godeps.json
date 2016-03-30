@@ -121,12 +121,12 @@
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/go-trello",
-			"Comment": "v0.1-37-g562057b",
-			"Rev": "562057bef98a2570cc7ccbce3bd0a9af89d605b6"
+			"Comment": "v0.1-38-g4091080",
+			"Rev": "40910808dc8d584377f0b0d16630f53c73884aaf"
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/mailgun-go",
-			"Rev": "17a28ae342c3dbd856729229e80cb29282fffe87"
+			"Rev": "a9daf8df4adae4df0c83b539c0fdaaf74536137c"
 		},
 		{
 			"ImportPath": "github.com/xtgo/uuid",

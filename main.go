@@ -136,7 +136,7 @@ func main() {
 func sendJSONError(w http.ResponseWriter, err error, code int, logger *log.Entry) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	logger.WithFields(log.Fields{"code": code}).Error("returned JSON error")
+	logger.WithFields(log.Fields{"code": code, "err": err}).Error("returned JSON error")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(err.Error())
 }

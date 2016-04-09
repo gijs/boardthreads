@@ -320,6 +320,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 
 	// upload the message as an attachment
 	var attachedBody goTrello.Attachment
+	var processedStrippedHTML string = message.StrippedHtml
 	for {
 		ext := ".txt"
 		body := message.BodyPlain // default case, 'body-plain' is always present.
@@ -340,6 +341,9 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				body = strings.Replace(body, "cid:"+cid, newUrl, -1)
+
+				// use this opportunity to also replace in the strippedHTML that will be posted
+				processedStrippedHTML = strings.Replace(processedStrippedHTML, "cid:"+cid, newUrl, -1)
 			}
 		}
 
@@ -363,8 +367,9 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get markdown from message HTML
-	md := helpers.HTMLToMarkdown(message.StrippedHtml)
+	md := helpers.HTMLToMarkdown(processedStrippedHTML)
 	if md == "" {
+		// fallback
 		if message.StrippedText != "" {
 			md = message.StrippedText
 		} else {

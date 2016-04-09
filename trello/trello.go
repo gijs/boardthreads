@@ -4,7 +4,6 @@ import (
 	"bt/helpers"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -82,18 +81,6 @@ func EnsureBot(token, listId string) (*trello.Board, error) {
 	return board, nil
 }
 
-func ReviveCard(card *trello.Card) (err error) {
-	_, err = card.SendToBoard()
-	if err != nil {
-		return
-	}
-	// _, err = card.MoveToPos("top")
-	// if err != nil {
-	// 	return
-	// }
-	return nil
-}
-
 func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *trello.Card, err error) {
 	list, err := Client.List(listId)
 	if err != nil {
@@ -101,30 +88,20 @@ func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *
 	}
 
 	card, err = list.AddCard(trello.Card{
-		IdList: listId,
-		Name:   fmt.Sprintf("%s :: %s", helpers.ReplyToOrFrom(message), helpers.ExtractSubject(message.Subject)),
-		Desc: fmt.Sprintf(`
----
-
-to: %s
-recipient: %s
-from: %s
-reply-to: %s
-subject: %s
-
----
-            `,
-			helpers.MessageHeader(message, "To"),
-			message.Recipients,
-			message.From,
-			helpers.ReplyToOrFrom(message),
-			message.Subject,
-		),
+		IdList:    listId,
+		Name:      helpers.MakeCardName(message),
+		Desc:      helpers.MakeCardDesc(message),
 		Pos:       0,
 		IdMembers: []string{settings.BotId},
 	})
 
 	return
+}
+
+func PutMessageBodyOnDesc(card *trello.Card, message mailgun.StoredMessage, markdownBody string) error {
+	newDesc := helpers.MakeCardDesc(message)
+	newDesc += "\n\n" + markdownBody
+	return card.SetDesc(newDesc)
 }
 
 func CreateWebhook(entityId, endpoint string) (string, error) {

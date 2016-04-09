@@ -205,6 +205,24 @@ func (c *Card) Actions() (actions []Action, err error) {
 	return
 }
 
+// SetDesc will set the card description
+// https://developers.trello.com/advanced-reference/card#put-1-cards-card-id-or-shortlink-desc
+func (c *Card) SetDesc(desc string) error {
+	payload := url.Values{}
+	payload.Set("value", desc)
+	body, err := c.client.Put("/cards/"+c.Id+"/desc", payload)
+	if err != nil {
+		return err
+	}
+
+	// unmarshal the new card JSON information over the current card struct
+	// it will just complete the data, not erase unnecessarily
+	if err = json.Unmarshal(body, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Delete will delete the card forever
 // https://developers.trello.com/advanced-reference/card#delete-1-cards-card-id-or-shortlink
 func (c *Card) Delete() error {

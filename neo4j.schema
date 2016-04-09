@@ -9,6 +9,10 @@
               can be set for plastic reasons. disabled when MX records are set */
   senderName, /* also for plastic reasons, the "Name" in "Name <address@email.com>" */
   addReplier, /* configuration option for adding the replier to the cards to which he replies */
+  messageInDesc, /* besides posting a comment, the first message of the thread will
+                    go in the card's description */
+  signatureTemplate, /* template for a signature to append to all emails. may take variables */
+  moveToTop, /* should this card be moved to the top of the list when a new message arrives or not */
 })
 (:Domain {host})
 (:Mail {id, date, subject, from, commentId})

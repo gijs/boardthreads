@@ -192,13 +192,14 @@ DELETE n,r
 			})
 
 			g.It("should send a fake email from a fake comment", func() {
-				Expect(GetEmailParamsForCard("csl3739")).To(BeEquivalentTo(emailParams{
+				Expect(GetEmailParamsForCard("csl3739")).To(BeEquivalentTo(sendingParams{
 					LastMailId:      "<mid3739>",
 					LastMailSubject: "this message",
 					InboundAddr:     "bob@boardthreads.com",
 					OutboundAddr:    "emailto@bob.com",
-					ReplyTo:         "bob@boardthreads.com",
 					Recipients:      []string{"from@someone.com"},
+					ReplyTo:         "bob@boardthreads.com",
+					AddReplier:      false,
 				}))
 
 				Expect(SaveCommentSent("csl3739", "bob", "<repl3739>", "32423432")).To(Succeed())
@@ -361,61 +362,82 @@ DELETE n,r
 		g.Describe("custom params", func() {
 
 			g.It("fetch default params for a card", func() {
-				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
-					LastMailId:      "<mid992>",
-					LastMailSubject: "it is complicated",
-					InboundAddr:     "maria@boardthreads.com",
-					OutboundAddr:    "maria@boardthreads.com",
-					ReplyTo:         "maria@boardthreads.com",
-					Recipients:      []string{"from@someone.com"},
-					AddReplier:      false,
-					SenderName:      "",
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(sendingParams{
+					LastMailId:        "<mid992>",
+					LastMailSubject:   "it is complicated",
+					InboundAddr:       "maria@boardthreads.com",
+					OutboundAddr:      "maria@boardthreads.com",
+					Recipients:        []string{"from@someone.com"},
+					ReplyTo:           "maria@boardthreads.com",
+					SenderName:        "",
+					SignatureTemplate: "",
+					AddReplier:        false,
 				}))
 			})
 
 			g.It("should set some params then fetch again", func() {
 				Expect(ChangeAddressSettings("maria", "maria@boardthreads.com", AddressSettings{
-					ReplyTo:    "cuisine@maria.com",
-					SenderName: "Marie",
-					AddReplier: true,
+					ReplyTo:           "cuisine@maria.com",
+					SenderName:        "Marie",
+					AddReplier:        true,
+					MessageInDesc:     false,
+					SignatureTemplate: "---\n\nThanks!\n{NAME}",
+					MoveToTop:         true,
 				})).To(Succeed())
 
-				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
-					LastMailId:      "<mid992>",
-					LastMailSubject: "it is complicated",
-					InboundAddr:     "maria@boardthreads.com",
-					OutboundAddr:    "maria@boardthreads.com",
-					ReplyTo:         "cuisine@maria.com",
-					Recipients:      []string{"from@someone.com"},
-					AddReplier:      true,
-					SenderName:      "Marie",
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(sendingParams{
+					LastMailId:        "<mid992>",
+					LastMailSubject:   "it is complicated",
+					InboundAddr:       "maria@boardthreads.com",
+					OutboundAddr:      "maria@boardthreads.com",
+					Recipients:        []string{"from@someone.com"},
+					ReplyTo:           "cuisine@maria.com",
+					SenderName:        "Marie",
+					SignatureTemplate: "---\n\nThanks!\n{NAME}",
+					AddReplier:        true,
 				}))
 
+				Expect(GetReceivingParams("maria@boardthreads.com")).To(BeEquivalentTo(
+					receivingParams{false, true},
+				))
+
 				addr, _ := GetAddress("maria", "maria@boardthreads.com")
-				Expect(addr.Settings).To(BeEquivalentTo(AddressSettings{"Marie", "cuisine@maria.com", true}))
+				Expect(addr.Settings).To(BeEquivalentTo(
+					AddressSettings{"Marie", "cuisine@maria.com", true, false, "---\n\nThanks!\n{NAME}", true}),
+				)
 			})
 
 			g.It("set some params and unset others, then fetch", func() {
 				Expect(ChangeAddressSettings("maria", "maria@boardthreads.com", AddressSettings{
-					SenderName: "Mariah",
-					AddReplier: false,
-					ReplyTo:    "cuisine@maria.com", // all params must be set again everytime,
+					SenderName:    "Mariah",
+					AddReplier:    false,
+					MessageInDesc: true,
+					ReplyTo:       "cuisine@maria.com", // all params must be set again everytime,
 					// otherwise they are replaced with default values
+					// it will happen with SignatureTemplate right now
+					MoveToTop: false,
 				})).To(Succeed())
 
-				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(emailParams{
-					LastMailId:      "<mid992>",
-					LastMailSubject: "it is complicated",
-					InboundAddr:     "maria@boardthreads.com",
-					OutboundAddr:    "maria@boardthreads.com",
-					ReplyTo:         "cuisine@maria.com",
-					Recipients:      []string{"from@someone.com"},
-					AddReplier:      false,
-					SenderName:      "Mariah",
+				Expect(GetEmailParamsForCard("csl9797")).To(BeEquivalentTo(sendingParams{
+					LastMailId:        "<mid992>",
+					LastMailSubject:   "it is complicated",
+					InboundAddr:       "maria@boardthreads.com",
+					OutboundAddr:      "maria@boardthreads.com",
+					Recipients:        []string{"from@someone.com"},
+					ReplyTo:           "cuisine@maria.com",
+					SenderName:        "Mariah",
+					SignatureTemplate: "",
+					AddReplier:        false,
 				}))
 
+				Expect(GetReceivingParams("maria@boardthreads.com")).To(BeEquivalentTo(
+					receivingParams{true, false},
+				))
+
 				addr, _ := GetAddress("maria", "maria@boardthreads.com")
-				Expect(addr.Settings).To(BeEquivalentTo(AddressSettings{"Mariah", "cuisine@maria.com", false}))
+				Expect(addr.Settings).To(BeEquivalentTo(
+					AddressSettings{"Mariah", "cuisine@maria.com", false, true, "", false}),
+				)
 			})
 
 		})

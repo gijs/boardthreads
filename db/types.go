@@ -19,21 +19,24 @@ const (
 )
 
 type Address struct {
-	Start             int64           `json:"-"                db:"date"`
-	UserId            string          `json:"-"                db:"userId"`
-	BoardShortLink    string          `json:"boardShortLink"   db:"boardShortLink"`
-	ListId            string          `json:"listId"           db:"listId"`
-	InboundAddr       string          `json:"inboundaddr"      db:"inboundaddr"`
-	OutboundAddr      string          `json:"outboundaddr"     db:"outboundaddr"`
-	RouteId           string          `json:"-"                db:"routeId"`
-	DomainName        string          `json:"-"                db:"domain"`
-	DomainStatus      *mailgun.Domain `json:"domain,omitempty"`
-	PaypalProfileId   string          `json:"-"                db:"paypalProfileId"`
-	Status            addressStatus   `json:"status"`
-	SenderNameSetting string          `json:"-"                              db:"senderName"`
-	ReplyToSetting    string          `json:"-"                              db:"replyTo"`
-	AddReplierSetting bool            `json:"-"                              db:"addReplier"`
-	Settings          AddressSettings `json:"settings"`
+	Start              int64           `json:"-"                db:"date"`
+	UserId             string          `json:"-"                db:"userId"`
+	BoardShortLink     string          `json:"boardShortLink"   db:"boardShortLink"`
+	ListId             string          `json:"listId"           db:"listId"`
+	InboundAddr        string          `json:"inboundaddr"      db:"inboundaddr"`
+	OutboundAddr       string          `json:"outboundaddr"     db:"outboundaddr"`
+	RouteId            string          `json:"-"                db:"routeId"`
+	DomainName         string          `json:"-"                db:"domain"`
+	DomainStatus       *mailgun.Domain `json:"domain,omitempty"`
+	PaypalProfileId    string          `json:"-"                db:"paypalProfileId"`
+	Status             addressStatus   `json:"status"`
+	SenderNameSetting  string          `json:"-"                db:"senderName"`
+	ReplyToSetting     string          `json:"-"                db:"replyTo"`
+	AddReplierSetting  bool            `json:"-"                db:"addReplier"`
+	SignatureSetting   string          `json:"-"                db:"signatureTemplate"`
+	MessageDescSetting bool            `json:"-"                db:"messageInDesc"`
+	MoveToTopSetting   bool            `json:"-"                db:"moveToTop"`
+	Settings           AddressSettings `json:"settings"`
 }
 
 func (addr *Address) StartTime() time.Time {
@@ -45,9 +48,15 @@ func (addr *Address) PostProcess() {
 	addr.Settings.SenderName = addr.SenderNameSetting
 	addr.Settings.ReplyTo = addr.ReplyToSetting
 	addr.Settings.AddReplier = addr.AddReplierSetting
+	addr.Settings.MessageInDesc = addr.MessageDescSetting
+	addr.Settings.SignatureTemplate = addr.SignatureSetting
+	addr.Settings.MoveToTop = addr.MoveToTopSetting
 	addr.SenderNameSetting = ""
 	addr.ReplyToSetting = ""
 	addr.AddReplierSetting = false
+	addr.MessageDescSetting = false
+	addr.SignatureSetting = ""
+	addr.MoveToTopSetting = false
 
 	// status
 	if addr.PaypalProfileId != "" {
@@ -60,9 +69,12 @@ func (addr *Address) PostProcess() {
 }
 
 type AddressSettings struct {
-	SenderName string `json:"senderName"`
-	ReplyTo    string `json:"replyTo"`
-	AddReplier bool   `json:"addReplier"`
+	SenderName        string `json:"senderName"`
+	ReplyTo           string `json:"replyTo"`
+	AddReplier        bool   `json:"addReplier"`
+	MessageInDesc     bool   `json:"messageInDesc"`
+	SignatureTemplate string `json:"signatureTemplate"`
+	MoveToTop         bool   `json:"moveToTop"`
 }
 
 type Email struct {
@@ -79,13 +91,19 @@ func (email *Email) Time() time.Time {
 	return time.Unix(email.Date/1000, 0)
 }
 
-type emailParams struct {
-	LastMailId      string   `db:"lastMailId"`
-	LastMailSubject string   `db:"lastMailSubject"`
-	InboundAddr     string   `db:"inbound"`
-	OutboundAddr    string   `db:"outbound"`
-	ReplyTo         string   `db:"replyTo"`
-	Recipients      []string `db:"recipients"`
-	AddReplier      bool     `db:"addReplier"`
-	SenderName      string   `db:"senderName"`
+type sendingParams struct {
+	LastMailId        string   `db:"lastMailId"`
+	LastMailSubject   string   `db:"lastMailSubject"`
+	InboundAddr       string   `db:"inbound"`
+	OutboundAddr      string   `db:"outbound"`
+	Recipients        []string `db:"recipients"`
+	ReplyTo           string   `db:"replyTo"`
+	SenderName        string   `db:"senderName"`
+	AddReplier        bool     `db:"addReplier"` // it is used in the mailgun success callback
+	SignatureTemplate string   `db:"signatureTemplate"`
+}
+
+type receivingParams struct {
+	MessageInDesc bool `db:"messageInDesc"`
+	MoveToTop     bool `db:"moveToTop"`
 }

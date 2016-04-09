@@ -71,7 +71,10 @@ RETURN
   CASE WHEN c.paypalProfileId IS NOT NULL THEN c.paypalProfileId ELSE "" END AS paypalProfileId,
   CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
   CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
-  CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier
+  CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier,
+  CASE WHEN addr.messageInDesc IS NOT NULL THEN addr.messageInDesc ELSE false END AS messageInDesc,
+  CASE WHEN addr.signatureTemplate IS NOT NULL THEN addr.signatureTemplate ELSE "" END AS signatureTemplate,
+  CASE WHEN addr.moveToTop IS NOT NULL THEN addr.moveToTop ELSE false END AS moveToTop
 LIMIT 1
 `, emailAddress, userId)
 	if err != nil {
@@ -271,7 +274,7 @@ MERGE (o)<-[:SENDS_THROUGH]-(e)
 	return
 }
 
-func ChangeAddressSettings(userId, address string, params AddressSettings) error {
+func ChangeAddressSettings(userId, address string, p AddressSettings) error {
 	address = strings.ToLower(address)
 
 	var tmp string
@@ -280,8 +283,12 @@ MATCH (addr:EmailAddress {address: {1}})<-[:CONTROLS]-(user:User {id: {0}})
 SET addr.replyTo = {2}
 SET addr.senderName = {3}
 SET addr.addReplier = {4}
+SET addr.messageInDesc = {5}
+SET addr.signatureTemplate = {6}
+SET addr.moveToTop = {7}
 RETURN user.id // just to fail when "no rows..."
-    `, userId, address, params.ReplyTo, params.SenderName, params.AddReplier)
+    `, userId, address,
+		p.ReplyTo, p.SenderName, p.AddReplier, p.MessageInDesc, p.SignatureTemplate, p.MoveToTop)
 	return err
 }
 
@@ -480,7 +487,18 @@ RETURN
 	return email, nil
 }
 
-func GetEmailParamsForCard(shortLink string) (params emailParams, err error) {
+func GetReceivingParams(address string) (params receivingParams, err error) {
+	err = DB.Get(&params, `
+MATCH (addr:EmailAddress {address: {0}})
+RETURN
+  CASE WHEN addr.messageInDesc IS NOT NULL THEN addr.messageInDesc ELSE false END AS messageInDesc,
+  CASE WHEN addr.moveToTop IS NOT NULL THEN addr.moveToTop ELSE false END AS moveToTop
+LIMIT 1
+    `, address)
+	return
+}
+
+func GetEmailParamsForCard(shortLink string) (params sendingParams, err error) {
 	err = DB.Get(&params, `
 MATCH (c:Card) WHERE c.shortLink = {0} OR c.id = {0}
 MATCH (c)--(addr:EmailAddress)
@@ -500,6 +518,7 @@ RETURN
  CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
  CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
  CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier,
+ CASE WHEN addr.signatureTemplate IS NOT NULL THEN addr.signatureTemplate ELSE "" END AS signatureTemplate,
  recipients
 LIMIT 1`, shortLink)
 	return

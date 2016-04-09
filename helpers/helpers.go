@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -147,4 +148,28 @@ func CommentStripPrefix(text string) string {
 	text = strings.TrimPrefix(text, ":e-mail: ")
 	text = strings.TrimPrefix(text, ":envelope: ")
 	return text
+}
+
+func MakeCardName(message mailgun.StoredMessage) string {
+	return fmt.Sprintf("%s :: %s", ReplyToOrFrom(message), ExtractSubject(message.Subject))
+}
+
+func MakeCardDesc(message mailgun.StoredMessage) string {
+	return fmt.Sprintf(`
+---
+
+to: %s
+recipient: %s
+from: %s
+reply-to: %s
+subject: %s
+
+---
+            `,
+		MessageHeader(message, "To"),
+		message.Recipients,
+		message.From,
+		ReplyToOrFrom(message),
+		message.Subject,
+	)
 }

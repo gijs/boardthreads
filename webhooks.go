@@ -6,6 +6,7 @@ import (
 	"bt/helpers"
 	"bt/mailgun"
 	"bt/trello"
+	"bytes"
 	"errors"
 	"math/rand"
 
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -160,9 +162,15 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// fetch preferences for dealing with this message on trello
+	prefs, err := db.GetReceivingParams(inboundAddr)
+	if err != nil {
+		// an error is not that serious, let's just post the message with the defaults
+		logger.WithField("err", err).Warn("couldn't fetch receiving preferences")
+	}
+
 	// card creation process
 	createCard := func() *goTrello.Card {
-		// card creation process
 		card, err := trello.CreateCardFromMessage(listId, message)
 		if err != nil {
 			sendJSONError(w, err, 503, logger)
@@ -185,6 +193,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			sendJSONError(w, err, 500, logger)
 			return nil
 		}
+
 		return card
 	}
 
@@ -223,11 +232,25 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			card = createCard()
 		} else {
 			// card exists on trello, revive it
-			err = trello.ReviveCard(card)
+			_, err = card.SendToBoard()
 			if err != nil {
 				sendJSONError(w, err, 503, logger)
 				return
 			}
+			if prefs.MoveToTop {
+				_, err = card.MoveToPos(0)
+				if err != nil {
+					// this error is not big enough to justify abandoning the request
+					logger.WithFields(log.Fields{
+						"err": err,
+					}).Warn("couldn't move card to top of list")
+				}
+			}
+
+			// in this case, we will not put the message on the card's description
+			// no matter what (because the card is not new)
+			// so we fake the prefs.MessageInDesc to reflect this
+			prefs.MessageInDesc = false
 		}
 	} else {
 		// card doesn't exist on our db, proceed to the card creation proccess
@@ -371,6 +394,15 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		}).Error("couldn't post the comment")
 		return
 		// do not return an error or the webhook will retry and more cards will be created
+	}
+
+	// if this setting is enabled, update the card description
+	if prefs.MessageInDesc {
+		err = trello.PutMessageBodyOnDesc(card, message, commentText)
+		if err != nil {
+			// we shouldn't care a lot for this error
+			log.WithField("err", err).Warn("couldn't add message to card desc.")
+		}
 	}
 
 	// save it on the database
@@ -527,6 +559,40 @@ sendMail:
 	// the default, safe replyTo address
 	if params.ReplyTo == "" || !isEmail(params.ReplyTo) {
 		params.ReplyTo = params.InboundAddr
+	}
+
+	// add signature, if specified
+	for {
+		var err error
+		var sign *template.Template
+		var buf bytes.Buffer
+
+		if params.SignatureTemplate != "" {
+			sign, err = template.New("signature").Delims("{", "}").Funcs(template.FuncMap{
+				"NAME":     func() string { return wh.Action.MemberCreator.FullName },
+				"USERNAME": func() string { return wh.Action.MemberCreator.Username },
+			}).Parse(params.SignatureTemplate)
+			if err != nil {
+				goto signatureError
+			}
+
+			err = sign.Execute(&buf, nil)
+			if err != nil {
+				goto signatureError
+			}
+
+			strippedText += "\n\n" + buf.String()
+			break
+
+		signatureError:
+			// this error is not a big deal, we will ignore it
+			logger.WithFields(log.Fields{
+				"err":       err,
+				"signature": params.SignatureTemplate,
+			}).Warn("couldn't render signature.")
+			break
+		}
+		break
 	}
 
 	// actually send

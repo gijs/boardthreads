@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"gopkg.in/validator.v2"
@@ -302,6 +303,13 @@ func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// intercept possibly wrong values
+	params.SignatureTemplate = strings.TrimSpace(params.SignatureTemplate)
+	if len(params.SignatureTemplate) > 250 {
+		params.SignatureTemplate = params.SignatureTemplate[:250]
+	}
+	// ReplyTo is verified to be a valid email at send time.
+
 	logger.WithFields(log.Fields{
 		"address": address,
 		"user":    userId,
@@ -313,6 +321,16 @@ func ChangeAddressSettings(w http.ResponseWriter, r *http.Request) {
 		sendJSONError(w, err, 400, logger)
 		return
 	}
+
+	// tracking
+	segment.Track(&analytics.Track{
+		Event:  "Changed settings",
+		UserId: userId,
+		Properties: map[string]interface{}{
+			"address":  vars["address"] + "@" + settings.BaseDomain,
+			"settings": params,
+		},
+	})
 }
 
 func DeleteAddress(w http.ResponseWriter, r *http.Request) {

@@ -329,6 +329,41 @@ DELETE n,r
 				DB.Select(&ids, `MATCH (c:Card {id: "cid9797"})--(m:Mail) RETURN m.id ORDER BY m.id`)
 				Expect(ids).To(BeEquivalentTo([]string{"<mid991>", "<mid992>", "<mid99>", "<replwew4>"}))
 			})
+
+			g.It("should change the parameters of the first email in the thread", func() {
+				Expect(EnsureUser("changer")).To(Equal(true))
+				SetAddress("changer", "b482284", "l842842", "changer@boardthreads.com", "changer@boardthreads.com")
+				Expect(SaveCardWithEmail("changer@boardthreads.com", "csl4882", "cid4882", "48484848")).To(Succeed())
+				Expect(SaveEmailReceived("cid4882", "csl4882", "<mid4882>", "message with wrong sender", "wrong@hotmail-wrong.com", "comm4882")).To(Succeed())
+
+				Expect(ChangeThreadParams("csl4882", ThreadParams{
+					Subject: "message with the right sender",
+					ReplyTo: "right@hotmail.com",
+				})).To(Succeed())
+
+				sp, _ := GetEmailParamsForCard("csl4882")
+				Expect(sp.Recipients).To(ConsistOf([]string{"right@hotmail.com"}))
+				Expect(sp.LastMailSubject).To(Equal("message with the right sender"))
+			})
+
+			g.It("should change ONLY the first email", func() {
+				Expect(SaveEmailReceived("cid4882", "csl4882", "<mid4882-2>", "new subject has arrived", "wrong@hotmail-wrong.com", "comm4882-2")).To(Succeed())
+
+				sp, _ := GetEmailParamsForCard("csl4882")
+				Expect(sp.Recipients).To(ConsistOf([]string{"right@hotmail.com", "wrong@hotmail-wrong.com"}))
+				Expect(sp.LastMailSubject).To(Equal("new subject has arrived"))
+
+				Expect(SaveEmailReceived("cid4882", "csl4882", "<mid4882-3>", "this subject is what counts", "person@somewhereelse.com", "comm4882-3")).To(Succeed())
+
+				Expect(ChangeThreadParams("csl4882", ThreadParams{
+					Subject: "doesn't matter",
+					ReplyTo: "otherperson@hotmail.com",
+				})).To(Succeed())
+
+				sp, _ = GetEmailParamsForCard("csl4882")
+				Expect(sp.Recipients).To(ConsistOf([]string{"otherperson@hotmail.com", "wrong@hotmail-wrong.com", "person@somewhereelse.com"}))
+				Expect(sp.LastMailSubject).To(Equal("this subject is what counts"))
+			})
 		})
 
 		g.Describe("account info", func() {

@@ -9,7 +9,7 @@ go:
 install:
   - go get 'github.com/franela/goblin'
   - go get 'github.com/onsi/gomega'
-  - go get 'github.com/VojtechVitek/go-trello'
+  - go get 'github.com/websitesfortrello/go-trello'
 
 script:
   - go test ./tests/...

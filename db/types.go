@@ -107,3 +107,8 @@ type receivingParams struct {
 	MessageInDesc bool `db:"messageInDesc"`
 	MoveToTop     bool `db:"moveToTop"`
 }
+
+type ThreadParams struct {
+	ReplyTo string `yaml:"reply-to"`
+	Subject string `yaml:"subject"`
+}

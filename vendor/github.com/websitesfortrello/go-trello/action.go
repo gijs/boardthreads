@@ -54,6 +54,7 @@ type Action struct {
 		Card struct {
 			Id        string `json:"id"`
 			Name      string `json:"name"`
+			Desc      string `json:"desc"`
 			ShortLink string `json:"shortLink"`
 			IdShort   int    `json:"idShort"`
 		} `json:"card"`
@@ -62,8 +63,14 @@ type Action struct {
 			Text string `json:"text"`
 		} `json:"action"`
 		Old struct {
-			Text string `json:"text"`
-		}
+			Text   string  `json:"text"`
+			Name   string  `json:"name"`
+			Desc   string  `json:"desc"`
+			Closed bool    `json:"closed"`
+			Color  string  `json:"color"`
+			Pos    float64 `json:"pos"`
+			IdList string  `json:"idList"`
+		} `json:"old"`
 		Text string `json:"text"`
 	} `json:"data"`
 	Type          string `json:"type"`

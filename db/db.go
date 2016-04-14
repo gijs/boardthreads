@@ -1,7 +1,7 @@
 package db
 
 import (
-	"bt/helpers"
+	"bt/mailgun"
 	"errors"
 	"strings"
 
@@ -362,7 +362,7 @@ RETURN
  last,
  (TIMESTAMP() - last > 1000*60*60*24*15) AS expired // expiration: 15 days
 LIMIT 1
-    `, messageId, rawSubject, helpers.ExtractSubject(rawSubject), strings.ToLower(senderAddress))
+    `, messageId, rawSubject, mailgun.TrimSubject(rawSubject), strings.ToLower(senderAddress))
 
 	if err != nil {
 		if err.Error() != "sql: no rows in result set" {
@@ -539,6 +539,20 @@ WITH c
   SET c.id = {5}
 `, cardShortLink, messageId, subject, strings.ToLower(from), commentId, cardId)
 	return
+}
+
+func ChangeThreadParams(cardId string, params ThreadParams) (err error) {
+	_, err = DB.Exec(`
+MATCH (c:Card) WHERE c.shortLink = {0} OR c.id = {0}
+MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
+
+WITH m ORDER BY m.date LIMIT 1
+SET m.subject = {1}
+SET m.from = {2}
+
+RETURN m // just to fail when "no rows..."
+    `, cardId, params.Subject, params.ReplyTo)
+	return err
 }
 
 func SaveCommentSent(cardShortLink, commenterId, messageId, commentId string) (err error) {

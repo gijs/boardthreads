@@ -31,15 +31,5 @@ func TestDB(t *testing.T) {
 			Expect(ParseMultipleAddresses("pÉo <ope@poe.eop>, yy<ytue@ut.ey>")).To(BeEquivalentTo([]string{"ope@poe.eop", "ytue@ut.ey"}))
 		})
 
-		g.It("should extract subject", func() {
-			Expect(ExtractSubject("subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject("fwd: subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject("Fwd: subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject("re: subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject("RE: subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject(" Fwd: subject x")).To(Equal("subject x"))
-			Expect(ExtractSubject("re: subject x ")).To(Equal("subject x"))
-		})
-
 	})
 }

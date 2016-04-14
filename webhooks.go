@@ -415,7 +415,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		card.Id,
 		card.ShortLink,
 		helpers.MessageHeader(message, "Message-Id"),
-		helpers.ExtractSubject(message.Subject),
+		mailgun.TrimSubject(message.Subject),
 		helpers.ReplyToOrFrom(message),
 		comment.Id,
 	)
@@ -493,6 +493,11 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
 		if err != nil {
 			// a real error
+			logger.WithFields(log.Fields{
+				"err":     err,
+				"comment": wh.Action.Data.Action.Id,
+				"card":    wh.Action.Data.Card.ShortLink,
+			}).Error("couldn't fetch email for comment id.")
 			goto abort
 		} else if email.Id == "" {
 			// we couldn't find it, so let's send
@@ -510,6 +515,28 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 			goto abort
 		}
 		goto sendMail
+	case "updateCard":
+		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
+		params, err := helpers.ParseCardDescription(wh.Action.Data.Card.Desc)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"err":  err,
+				"card": wh.Action.Data.Card.ShortLink,
+				"desc": wh.Action.Data.Card.Desc,
+			}).Info("desc change will not take effect.")
+			goto abort
+		}
+
+		logger.WithFields(log.Fields{
+			"params": params,
+			"card":   wh.Action.Data.Card.ShortLink,
+		}).Info("changing first email params.")
+		err = db.ChangeThreadParams(wh.Action.Data.Card.Id, params)
+		if err != nil {
+			log.WithField("err", err).Error("couldn't change thread params.")
+		}
+
+		goto abort
 	default:
 		w.WriteHeader(202)
 		return
@@ -609,7 +636,7 @@ sendMail:
 		FromName:      params.SenderName,
 		From:          sendingAddr,
 		Domain:        strings.Split(sendingAddr, "@")[1],
-		Subject:       helpers.ExtractSubject(params.LastMailSubject),
+		Subject:       mailgun.TrimSubject(params.LastMailSubject),
 		InReplyTo:     params.LastMailId,
 		ReplyTo:       params.ReplyTo,
 		CardId:        wh.Action.Data.Card.Id,

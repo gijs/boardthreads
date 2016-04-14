@@ -1,6 +1,10 @@
 package helpers
 
 import (
+	"bt/db"
+	"bt/mailgun"
+
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,8 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	log "github.com/Sirupsen/logrus"
-	"github.com/websitesfortrello/mailgun-go"
+	mailgunGo "github.com/websitesfortrello/mailgun-go"
 )
 
 var here string
@@ -83,23 +89,29 @@ func ParseMultipleAddresses(to string) ([]string, error) {
 	return addresses, nil
 }
 
-func ExtractSubject(subject string) string {
-	subject = strings.Trim(subject, " ")
-	for i := 0; i < 3; i++ {
-		subject = strings.TrimPrefix(subject, "fw:")
-		subject = strings.TrimPrefix(subject, "re:")
-		subject = strings.TrimPrefix(subject, "fwd:")
-		subject = strings.TrimPrefix(subject, "enc:")
-		subject = strings.TrimPrefix(subject, "FW:")
-		subject = strings.TrimPrefix(subject, "RE:")
-		subject = strings.TrimPrefix(subject, "FWD:")
-		subject = strings.TrimPrefix(subject, "ENC:")
-		subject = strings.TrimPrefix(subject, "Fw:")
-		subject = strings.TrimPrefix(subject, "Re:")
-		subject = strings.TrimPrefix(subject, "Fwd:")
-		subject = strings.TrimPrefix(subject, "Enc:")
+func ParseCardDescription(desc string) (params db.ThreadParams, err error) {
+	if desc == "" {
+		return params, errors.New("description is blank.")
 	}
-	return strings.TrimSpace(subject)
+
+	parts := strings.SplitN(desc, "---\n\n", 2)
+	if len(parts) < 2 {
+		return params, errors.New("no ---\\n\\n found.")
+	}
+	parts = strings.SplitN(parts[1], "\n\n---", 2)
+	if len(parts) < 2 {
+		return params, errors.New("no \\n\\n--- found.")
+	}
+
+	err = yaml.Unmarshal([]byte(parts[0]), &params)
+	if err != nil {
+		return params, err
+	}
+	if params.Subject == "" || params.ReplyTo == "" {
+		return params, errors.New("yaml missing required params.")
+	}
+
+	return params, nil
 }
 
 func DownloadFile(path, url, authName, authPassword string) (err error) {
@@ -126,7 +138,7 @@ func DownloadFile(path, url, authName, authPassword string) (err error) {
 	return
 }
 
-func ReplyToOrFrom(message mailgun.StoredMessage) string {
+func ReplyToOrFrom(message mailgunGo.StoredMessage) string {
 	replyto := MessageHeader(message, "Reply-To")
 	if replyto != "" {
 		return replyto
@@ -134,7 +146,7 @@ func ReplyToOrFrom(message mailgun.StoredMessage) string {
 	return ParseAddress(message.From)
 }
 
-func MessageHeader(message mailgun.StoredMessage, header string) string {
+func MessageHeader(message mailgunGo.StoredMessage, header string) string {
 	for _, pair := range message.MessageHeaders {
 		if pair[0] == header {
 			return pair[1]
@@ -150,11 +162,11 @@ func CommentStripPrefix(text string) string {
 	return text
 }
 
-func MakeCardName(message mailgun.StoredMessage) string {
-	return fmt.Sprintf("%s :: %s", ReplyToOrFrom(message), ExtractSubject(message.Subject))
+func MakeCardName(message mailgunGo.StoredMessage) string {
+	return fmt.Sprintf("%s :: %s", ReplyToOrFrom(message), mailgun.TrimSubject(message.Subject))
 }
 
-func MakeCardDesc(message mailgun.StoredMessage) string {
+func MakeCardDesc(message mailgunGo.StoredMessage) string {
 	return fmt.Sprintf(`
 ---
 

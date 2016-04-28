@@ -156,9 +156,9 @@ func MessageHeader(message mailgunGo.StoredMessage, header string) string {
 }
 
 func CommentStripPrefix(text string) string {
-	text = strings.TrimPrefix(text, ":email: ")
-	text = strings.TrimPrefix(text, ":e-mail: ")
-	text = strings.TrimPrefix(text, ":envelope: ")
+	text = strings.TrimPrefix(text, ":email:")
+	text = strings.TrimPrefix(text, ":e-mail:")
+	text = strings.TrimPrefix(text, ":envelope:")
 	return text
 }
 

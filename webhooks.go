@@ -26,6 +26,7 @@ import (
 	gfm "github.com/shurcooL/github_flavored_markdown"
 
 	goTrello "github.com/websitesfortrello/go-trello"
+	goMailgun "github.com/websitesfortrello/mailgun-go"
 )
 
 func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
@@ -154,12 +155,36 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	userId, _ := db.GetUserForAddress(inboundAddr)
 
 	// fetch entire email message
-	urlp := strings.Split(url, "/")
-	message, err := mailgun.Client.GetStoredMessage(urlp[len(urlp)-1])
+	message, err := mailgun.Client.GetStoredMessage(url)
 	if err != nil {
 		logger.WithField("err", err).Warn("couldn't fetch message from mailgun")
-		sendJSONError(w, err, 503, logger)
-		return
+
+		// build our own message
+		var headers [][]string
+		err = json.Unmarshal([]byte(r.PostFormValue("message-headers")), &headers)
+		if err != nil {
+			logger.WithField("err", err).Warn("couldn't build the message from the post parameters also")
+			sendJSONError(w, err, 503, logger)
+			return
+		}
+
+		message = goMailgun.StoredMessage{
+			Recipients:     r.PostFormValue("recipient"),
+			Sender:         r.PostFormValue("sender"),
+			From:           r.PostFormValue("from"),
+			Subject:        r.PostFormValue("Subject"),
+			StrippedText:   r.PostFormValue("stripped-text"),
+			StrippedHtml:   r.PostFormValue("stripped-html"),
+			BodyPlain:      r.PostFormValue("body-plain"),
+			MessageHeaders: headers,
+			ContentIDMap: map[string]struct {
+				Url         string `json:"url"`
+				ContentType string `json:"content-type"`
+				Name        string `json:"name"`
+				Size        int64  `json:"size"`
+			}{},
+			Attachments: []goMailgun.StoredAttachment{},
+		}
 	}
 
 	// fetch preferences for dealing with this message on trello

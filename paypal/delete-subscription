@@ -11,7 +11,7 @@ var paypal = new Paypal({
 var t = setTimeout(function () {}, 2000)
 var profileId = process.argv[2]
 
-paypal.deleteSubscription(profileId, 'Cancel', function (err, data) {
+paypal.modifySubscription(profileId, 'Cancel', 'User-triggered.', function (err, data) {
   if (err) {
     process.stdout.write(err)
     process.exit(1)

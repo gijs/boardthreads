@@ -3,8 +3,6 @@ package mailgun
 import (
 	"strconv"
 	"time"
-
-	"github.com/mbanzon/simplehttp"
 )
 
 // DefaultLimit and DefaultSkip instruct the SDK to rely on Mailgun's reasonable defaults for pagination settings.
@@ -68,15 +66,15 @@ func (d Domain) GetCreatedAt() (t time.Time, err error) {
 // Note that zero items and a zero-length slice do not necessarily imply an error occurred.
 // Except for the error itself, all results are undefined in the event of an error.
 func (m *MailgunImpl) GetDomains(limit, skip int) (int, []Domain, error) {
-	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint))
-	r.SetClient(m.Client())
+	r := newHTTPRequest(generatePublicApiUrl(domainsEndpoint))
+	r.setClient(m.Client())
 	if limit != DefaultLimit {
-		r.AddParameter("limit", strconv.Itoa(limit))
+		r.addParameter("limit", strconv.Itoa(limit))
 	}
 	if skip != DefaultSkip {
-		r.AddParameter("skip", strconv.Itoa(skip))
+		r.addParameter("skip", strconv.Itoa(skip))
 	}
-	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	r.setBasicAuth(basicAuthUser, m.ApiKey())
 
 	var envelope domainsEnvelope
 	err := getResponseFromJSON(r, &envelope)
@@ -88,9 +86,9 @@ func (m *MailgunImpl) GetDomains(limit, skip int) (int, []Domain, error) {
 
 // Retrieve detailed information about the named domain.
 func (m *MailgunImpl) GetSingleDomain(domain string) (Domain, []DNSRecord, []DNSRecord, error) {
-	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + domain)
-	r.SetClient(m.Client())
-	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	r := newHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + domain)
+	r.setClient(m.Client())
+	r.setBasicAuth(basicAuthUser, m.ApiKey())
 	var envelope singleDomainEnvelope
 	err := getResponseFromJSON(r, &envelope)
 	return envelope.Domain, envelope.ReceivingDNSRecords, envelope.SendingDNSRecords, err
@@ -99,9 +97,9 @@ func (m *MailgunImpl) GetSingleDomain(domain string) (Domain, []DNSRecord, []DNS
 // Trigger a DNS check for a domain
 // It is the same as pressing "Check DNS Records Now" on the web interface
 func (m *MailgunImpl) VerifyDomainDNS(domain string) error {
-	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + domain + "/verify")
-	r.SetClient(m.Client())
-	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	r := newHTTPRequest(generatePublicApiUrl(generatePublicApiUrl(domainsEndpoint) + "/" + domain + "/verify"))
+	r.setClient(m.Client())
+	r.setBasicAuth(basicAuthUser, m.ApiKey())
 	_, err := makePutRequest(r, nil)
 	return err
 }
@@ -113,24 +111,24 @@ func (m *MailgunImpl) VerifyDomainDNS(domain string) error {
 // The wildcard parameter instructs Mailgun to treat all subdomains of this domain uniformly if true,
 // and as different domains if false.
 func (m *MailgunImpl) CreateDomain(name string, smtpPassword string, spamAction string, wildcard bool) error {
-	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint))
-	r.SetClient(m.Client())
-	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	r := newHTTPRequest(generatePublicApiUrl(domainsEndpoint))
+	r.setClient(m.Client())
+	r.setBasicAuth(basicAuthUser, m.ApiKey())
 
-	payload := simplehttp.NewUrlEncodedPayload()
-	payload.AddValue("name", name)
-	payload.AddValue("smtp_password", smtpPassword)
-	payload.AddValue("spam_action", spamAction)
-	payload.AddValue("wildcard", strconv.FormatBool(wildcard))
+	payload := newUrlEncodedPayload()
+	payload.addValue("name", name)
+	payload.addValue("smtp_password", smtpPassword)
+	payload.addValue("spam_action", spamAction)
+	payload.addValue("wildcard", strconv.FormatBool(wildcard))
 	_, err := makePostRequest(r, payload)
 	return err
 }
 
 // DeleteDomain instructs Mailgun to dispose of the named domain name.
 func (m *MailgunImpl) DeleteDomain(name string) error {
-	r := simplehttp.NewHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + name)
-	r.SetClient(m.Client())
-	r.SetBasicAuth(basicAuthUser, m.ApiKey())
+	r := newHTTPRequest(generatePublicApiUrl(domainsEndpoint) + "/" + name)
+	r.setClient(m.Client())
+	r.setBasicAuth(basicAuthUser, m.ApiKey())
 	_, err := makeDeleteRequest(r)
 	return err
 }

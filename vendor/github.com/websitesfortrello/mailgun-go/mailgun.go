@@ -94,7 +94,6 @@ package mailgun
 
 import (
 	"fmt"
-	"github.com/mbanzon/simplehttp"
 	"io"
 	"net/http"
 	"time"
@@ -164,6 +163,7 @@ type Mailgun interface {
 	GetUnsubscribesByAddress(string) (int, []Unsubscription, error)
 	Unsubscribe(address, tag string) error
 	RemoveUnsubscribe(string) error
+	RemoveUnsubscribeWithTag(a, t string) error
 	CreateComplaint(string) error
 	DeleteComplaint(string) error
 	GetRoutes(limit, skip int) (int, []Route, error)
@@ -289,8 +289,8 @@ func generatePublicApiUrl(endpoint string) string {
 }
 
 // generateParameterizedUrl works as generateApiUrl, but supports query parameters.
-func generateParameterizedUrl(m Mailgun, endpoint string, payload simplehttp.Payload) (string, error) {
-	paramBuffer, err := payload.GetPayloadBuffer()
+func generateParameterizedUrl(m Mailgun, endpoint string, payload payload) (string, error) {
+	paramBuffer, err := payload.getPayloadBuffer()
 	if err != nil {
 		return "", err
 	}

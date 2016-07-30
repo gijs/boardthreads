@@ -159,7 +159,8 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.WithField("err", err).Warn("couldn't fetch message from mailgun")
 
-		// build our own message
+		// --- build our own message ---
+		// headers are very important, so we will fail without them:
 		var headers [][]string
 		err = json.Unmarshal([]byte(r.PostFormValue("message-headers")), &headers)
 		if err != nil {
@@ -167,6 +168,17 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			sendJSONError(w, err, 503, logger)
 			return
 		}
+
+		// attachments and content-id-map are not
+		var attachments []goMailgun.StoredAttachment
+		json.Unmarshal([]byte(r.PostFormValue("attachments")), &attachments)
+		var contentidmap = make(map[string]struct {
+			Url         string `json:"url"`
+			ContentType string `json:"content-type"`
+			Name        string `json:"name"`
+			Size        int64  `json:"size"`
+		})
+		json.Unmarshal([]byte(r.PostFormValue("content-id-map")), &contentidmap)
 
 		message = goMailgun.StoredMessage{
 			Recipients:     r.PostFormValue("recipient"),
@@ -177,13 +189,8 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			StrippedHtml:   r.PostFormValue("stripped-html"),
 			BodyPlain:      r.PostFormValue("body-plain"),
 			MessageHeaders: headers,
-			ContentIDMap: map[string]struct {
-				Url         string `json:"url"`
-				ContentType string `json:"content-type"`
-				Name        string `json:"name"`
-				Size        int64  `json:"size"`
-			}{},
-			Attachments: []goMailgun.StoredAttachment{},
+			ContentIDMap:   contentidmap,
+			Attachments:    attachments,
 		}
 	}
 

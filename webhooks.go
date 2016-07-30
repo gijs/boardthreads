@@ -172,13 +172,24 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		// attachments and content-id-map are not
 		var attachments []goMailgun.StoredAttachment
 		json.Unmarshal([]byte(r.PostFormValue("attachments")), &attachments)
-		var contentidmap = make(map[string]struct {
+		var contentidmap = map[string]string{}
+		var cidstructs = make(map[string]struct {
 			Url         string `json:"url"`
 			ContentType string `json:"content-type"`
 			Name        string `json:"name"`
 			Size        int64  `json:"size"`
 		})
-		json.Unmarshal([]byte(r.PostFormValue("content-id-map")), &contentidmap)
+		err = json.Unmarshal([]byte(r.PostFormValue("content-id-map")), &contentidmap)
+		if err == nil {
+			for cid, url := range contentidmap {
+				cidstructs[cid] = struct {
+					Url         string `json:"url"`
+					ContentType string `json:"content-type"`
+					Name        string `json:"name"`
+					Size        int64  `json:"size"`
+				}{url, "", "", 0}
+			}
+		}
 
 		message = goMailgun.StoredMessage{
 			Recipients:     r.PostFormValue("recipient"),
@@ -190,7 +201,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			BodyPlain:      r.PostFormValue("body-plain"),
 			BodyHtml:       r.PostFormValue("body-html"),
 			MessageHeaders: headers,
-			ContentIDMap:   contentidmap,
+			ContentIDMap:   cidstructs,
 			Attachments:    attachments,
 		}
 	}

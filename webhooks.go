@@ -188,6 +188,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 			StrippedText:   r.PostFormValue("stripped-text"),
 			StrippedHtml:   r.PostFormValue("stripped-html"),
 			BodyPlain:      r.PostFormValue("body-plain"),
+			BodyHtml:       r.PostFormValue("body-html"),
 			MessageHeaders: headers,
 			ContentIDMap:   contentidmap,
 			Attachments:    attachments,

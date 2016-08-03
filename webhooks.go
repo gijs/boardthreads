@@ -393,10 +393,9 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// save body-html as a temporary file then upload it
-		messageTime := time.Now().Format("2006-01-02 15:04:05 ")
-		messageFilename := messageTime + helpers.ReplyToOrFrom(message)
+		messageFilename := helpers.ReplyToOrFrom(message)
 		if len(messageFilename) > 80 {
-			messageFilename = messageTime + helpers.ReplyToOrFrom(message)[:26]
+			messageFilename = helpers.ReplyToOrFrom(message)[:79]
 		}
 		msgdst := filepath.Join(dir, messageFilename+"."+ext)
 		err = ioutil.WriteFile(msgdst, []byte(body), 0644)

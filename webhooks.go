@@ -155,56 +155,57 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	userId, _ := db.GetUserForAddress(inboundAddr)
 
 	// fetch entire email message
-	message, err := mailgun.Client.GetStoredMessage(url)
+	// -- do not fetch message from mailgun, use what comes in the post body
+	// message, err := mailgun.Client.GetStoredMessage(url)
+	// if err != nil {
+	//	logger.WithField("err", err).Warn("couldn't fetch message from mailgun")
+
+	// --- build our own message ---
+	// headers are very important, so we will fail without them:
+	var headers [][]string
+	err = json.Unmarshal([]byte(r.PostFormValue("message-headers")), &headers)
 	if err != nil {
-		logger.WithField("err", err).Warn("couldn't fetch message from mailgun")
+		logger.WithField("err", err).Warn("couldn't build the message from the post parameters also")
+		sendJSONError(w, err, 503, logger)
+		return
+	}
 
-		// --- build our own message ---
-		// headers are very important, so we will fail without them:
-		var headers [][]string
-		err = json.Unmarshal([]byte(r.PostFormValue("message-headers")), &headers)
-		if err != nil {
-			logger.WithField("err", err).Warn("couldn't build the message from the post parameters also")
-			sendJSONError(w, err, 503, logger)
-			return
-		}
-
-		// attachments and content-id-map are not
-		var attachments []goMailgun.StoredAttachment
-		json.Unmarshal([]byte(r.PostFormValue("attachments")), &attachments)
-		var contentidmap = map[string]string{}
-		var cidstructs = make(map[string]struct {
-			Url         string `json:"url"`
-			ContentType string `json:"content-type"`
-			Name        string `json:"name"`
-			Size        int64  `json:"size"`
-		})
-		err = json.Unmarshal([]byte(r.PostFormValue("content-id-map")), &contentidmap)
-		if err == nil {
-			for cid, url := range contentidmap {
-				cidstructs[cid] = struct {
-					Url         string `json:"url"`
-					ContentType string `json:"content-type"`
-					Name        string `json:"name"`
-					Size        int64  `json:"size"`
-				}{url, "", "", 0}
-			}
-		}
-
-		message = goMailgun.StoredMessage{
-			Recipients:     r.PostFormValue("recipient"),
-			Sender:         r.PostFormValue("sender"),
-			From:           r.PostFormValue("from"),
-			Subject:        r.PostFormValue("Subject"),
-			StrippedText:   r.PostFormValue("stripped-text"),
-			StrippedHtml:   r.PostFormValue("stripped-html"),
-			BodyPlain:      r.PostFormValue("body-plain"),
-			BodyHtml:       r.PostFormValue("body-html"),
-			MessageHeaders: headers,
-			ContentIDMap:   cidstructs,
-			Attachments:    attachments,
+	// attachments and content-id-map are not
+	var attachments []goMailgun.StoredAttachment
+	json.Unmarshal([]byte(r.PostFormValue("attachments")), &attachments)
+	var contentidmap = map[string]string{}
+	var cidstructs = make(map[string]struct {
+		Url         string `json:"url"`
+		ContentType string `json:"content-type"`
+		Name        string `json:"name"`
+		Size        int64  `json:"size"`
+	})
+	err = json.Unmarshal([]byte(r.PostFormValue("content-id-map")), &contentidmap)
+	if err == nil {
+		for cid, url := range contentidmap {
+			cidstructs[cid] = struct {
+				Url         string `json:"url"`
+				ContentType string `json:"content-type"`
+				Name        string `json:"name"`
+				Size        int64  `json:"size"`
+			}{url, "", "", 0}
 		}
 	}
+
+	message := goMailgun.StoredMessage{
+		Recipients:     r.PostFormValue("recipient"),
+		Sender:         r.PostFormValue("sender"),
+		From:           r.PostFormValue("from"),
+		Subject:        r.PostFormValue("Subject"),
+		StrippedText:   r.PostFormValue("stripped-text"),
+		StrippedHtml:   r.PostFormValue("stripped-html"),
+		BodyPlain:      r.PostFormValue("body-plain"),
+		BodyHtml:       r.PostFormValue("body-html"),
+		MessageHeaders: headers,
+		ContentIDMap:   cidstructs,
+		Attachments:    attachments,
+	}
+	//}
 
 	// fetch preferences for dealing with this message on trello
 	prefs, err := db.GetReceivingParams(inboundAddr)

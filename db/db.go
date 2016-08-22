@@ -149,7 +149,9 @@ OPTIONAL MATCH (oldaddress)-[s:SENDS_THROUGH]->(oldsendingaddress)
 OPTIONAL MATCH (olduser:User)-[c:CONTROLS]->(oldaddress)
 MERGE (newuser:User {id: {0}})
 MERGE (newaddr:EmailAddress {address: {3}})
-  ON CREATE SET newaddr.date = TIMESTAMP()
+  ON CREATE SET newaddr.date = TIMESTAMP(),
+                newaddr.moveToTop = true,
+                newaddr.addReplier = true
 MERGE (newlist:List {id: {2}})
 MERGE (board:Board {shortLink: {1}})
 

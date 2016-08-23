@@ -136,7 +136,7 @@
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/mailgun-go",
-			"Rev": "7fb549487c3e8282301823238a5f9b9321560038"
+			"Rev": "11949b4042ba489c61272e3d5f4b15de19130444"
 		},
 		{
 			"ImportPath": "github.com/xtgo/uuid",

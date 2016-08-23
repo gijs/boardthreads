@@ -94,6 +94,8 @@ func main() {
 		Handler(jwtMiddle.Handler(http.HandlerFunc(DeleteAddress)))
 	router.Path("/api/addresses/{address}/settings").Methods("PUT").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(ChangeAddressSettings)))
+	router.Path("/api/check-dns/{domain}").Methods("POST").
+		Handler(jwtMiddle.Handler(http.HandlerFunc(CheckDomainDNS)))
 
 	router.Path("/billing/{address}/paypal").Methods("GET").
 		Handler(jwtMiddle.Handler(http.HandlerFunc(UpgradeList)))

@@ -35,11 +35,11 @@ type Domain struct {
 // DNSRecord structures describe intended records to properly configure your domain for use with Mailgun.
 // Note that Mailgun does not host DNS records.
 type DNSRecord struct {
-	Priority   string
+	Priority   string `json:"priority"`
 	RecordType string `json:"record_type"`
-	Valid      string
-	Name       string
-	Value      string
+	Valid      string `json:"valid"`
+	Name       string `json:"name"`
+	Value      string `json:"value"`
 }
 
 type domainsEnvelope struct {

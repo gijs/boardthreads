@@ -392,3 +392,9 @@ func DeleteAddress(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+func CheckDomainDNS(w http.ResponseWriter, r *http.Request) {
+	domain := mux.Vars(r)["domain"]
+	mailgun.VerifyDNS(domain)
+	w.WriteHeader(202)
+}

@@ -146,6 +146,7 @@ type Mailgun interface {
 	GetSingleDomain(domain string) (Domain, []DNSRecord, []DNSRecord, error)
 	CreateDomain(name string, smtpPassword string, spamAction string, wildcard bool) error
 	DeleteDomain(name string) error
+	VerifyDomainDNS(domain string) error
 	GetCampaigns() (int, []Campaign, error)
 	CreateCampaign(name, id string) error
 	UpdateCampaign(oldId, name, newId string) error

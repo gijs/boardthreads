@@ -152,6 +152,10 @@ func ExtractDNS(domain string, records []mailgun.DNSRecord) *DNS {
 	return &s
 }
 
+func VerifyDNS(domain string) {
+	Client.VerifyDomainDNS(domain)
+}
+
 func isValid(s string) bool {
 	if s == "valid" {
 		return true

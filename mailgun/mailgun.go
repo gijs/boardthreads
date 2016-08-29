@@ -140,13 +140,13 @@ func ExtractDNS(domain string, records []mailgun.DNSRecord) *DNS {
 	for _, dns := range records {
 		if dns.RecordType == "TXT" {
 			if dns.Name == domain && strings.Contains(dns.Value, "include") {
-				s.Include = DNSRecord{"TXT", dns.Name, dns.Value, "", isValid(dns.Valid)}
+				v := strings.Replace(dns.Value, "mailgun.org", "boardthreads.com", 1)
+				s.Include = DNSRecord{"TXT", dns.Name, v, "", isValid(dns.Valid)}
 			} else if strings.HasSuffix(dns.Name, "domainkey."+domain) {
 				s.DomainKey = DNSRecord{"TXT", dns.Name, dns.Value, "", isValid(dns.Valid)}
 			}
 		} else if dns.RecordType == "MX" {
-			v := strings.Replace(dns.Value, "mailgun.org", "boardthreads.com", 1)
-			s.Receive = append(s.Receive, DNSRecord{"MX", "", v, dns.Priority, isValid(dns.Valid)})
+			s.Receive = append(s.Receive, DNSRecord{"MX", "", dns.Value, dns.Priority, isValid(dns.Valid)})
 		}
 	}
 	return &s

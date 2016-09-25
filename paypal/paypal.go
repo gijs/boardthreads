@@ -32,7 +32,7 @@ func GetAuthURL(userId, address, successURL, failureURL string) (string, error) 
 		BrandName             string `json:"BRANDNAME"`
 		Description           string `json:"L_BILLINGAGREEMENTDESCRIPTION0"`
 		BuyerEmailOptinEnable int    `json:"BUYEREMAILOPTINENABLE"`
-	}{successURL, failureURL, 10, "Boardthreads Helpdesk", descPrefix + address, 0})
+	}{successURL, failureURL, 18, "Boardthreads Helpdesk", descPrefix + address, 0})
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +55,7 @@ func CreateSubscription(userId, address, token, payerId string) (profileId strin
 		BillingFrequency    int    `json:"BILLINGFREQUENCY"`
 		MaxFailed           int    `json:"MAXFAILEDPAYMENTS"`
 		AutoBillOutstanding string `json:"AUTOBILLOUTAMT"`
-	}{10, descPrefix + address, "Month", 1, 3, "AddToNextBilling"})
+	}{18, descPrefix + address, "Month", 1, 3, "AddToNextBilling"})
 	if err != nil {
 		return "", err
 	}

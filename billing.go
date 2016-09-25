@@ -133,7 +133,7 @@ func PaypalSuccess(w http.ResponseWriter, r *http.Request) {
 		UserId: userId,
 		Properties: map[string]interface{}{
 			"address":  emailAddress,
-			"value":    10,
+			"value":    18,
 			"provider": "Paypal",
 		},
 	})

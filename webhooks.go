@@ -146,7 +146,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if listId == "" {
-		logger.Warn("no list registered for address " + inboundAddr)
+		// logger.Debug("no list registered for address " + inboundAddr)
 		sendJSONError(w, errors.New("no list registered for address."), 406, logger)
 		return
 	}

@@ -155,11 +155,16 @@ func MessageHeader(message mailgunGo.StoredMessage, header string) string {
 	return ""
 }
 
-func CommentStripPrefix(text string) string {
-	text = strings.TrimPrefix(text, ":email:")
-	text = strings.TrimPrefix(text, ":e-mail:")
-	text = strings.TrimPrefix(text, ":envelope:")
-	return text
+func CommentEnvelopePrefix(text string) (len int) {
+	lower := strings.ToLower(text)
+	if strings.HasPrefix(lower, ":email:") {
+		return 7
+	} else if strings.HasPrefix(lower, ":e-mail:") {
+		return 8
+	} else if strings.HasPrefix(lower, ":envelope:") {
+		return 10
+	}
+	return 0
 }
 
 func MakeCardName(message mailgunGo.StoredMessage) string {

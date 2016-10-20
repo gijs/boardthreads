@@ -528,11 +528,14 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	case "updateComment":
 		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
 		text := wh.Action.Data.Action.Text
-		strippedText = helpers.CommentStripPrefix(text)
-		if text == strippedText {
+
+		envelopePrefix := helpers.CommentEnvelopePrefix(text)
+		if envelopePrefix == 0 {
 			// comment doesn't have prefix
 			goto abort
 		}
+		strippedText = text[envelopePrefix:]
+
 		// see if we have already sent this message
 		email, err := db.GetEmailFromCommentId(wh.Action.Data.Action.Id)
 		if err != nil {
@@ -553,11 +556,14 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	case "commentCard":
 		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
 		text := wh.Action.Data.Text
-		strippedText = helpers.CommentStripPrefix(text)
-		if text == strippedText {
+
+		envelopePrefix := helpers.CommentEnvelopePrefix(text)
+		if envelopePrefix == 0 {
 			// comment doesn't have prefix
 			goto abort
 		}
+		strippedText = text[envelopePrefix:]
+
 		goto sendMail
 	case "updateCard":
 		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")

@@ -574,8 +574,15 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 			subjectnew, tonew, errnew := helpers.ParseCardName(wh.Action.Data.Card.Name)
 			if errnew != nil {
 				// changed the name to something unrelated, do nothing.
+				logger.WithField("err", err).Debug("error parsing new name")
 				goto abort
 			}
+			logger.WithFields(log.Fields{
+				"subjectold": subjectold,
+				"subjectnew": subjectnew,
+				"toold":      toold,
+				"tonew":      tonew,
+			}).Info("changed name")
 
 			// since we are changing the lastMailId, this can break threading in some cases.
 

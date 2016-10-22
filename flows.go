@@ -129,7 +129,8 @@ func CommentWithNewSendingParams(cardId string) {
 	// then post a comment
 	_, err = card.AddComment(
 		fmt.Sprintf(
-			`All comments from now on will be sent to **%s** with the subject _%s_.`,
+			`All comments from now on will be sent from %s to **%s** with the subject _%s_.`,
+			params.OutboundAddr,
 			params.Recipients,
 			params.LastMailSubject,
 		),

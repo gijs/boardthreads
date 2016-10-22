@@ -72,10 +72,6 @@
 			"Rev": "12c18e8343f6eb5fc3a9d5c8dc353e42e6bb40b9"
 		},
 		{
-			"ImportPath": "github.com/mbanzon/simplehttp",
-			"Rev": "ed64292224debb8a65122f3c2b71d4cd514bc48b"
-		},
-		{
 			"ImportPath": "github.com/microcosm-cc/bluemonday",
 			"Rev": "4ac6f27528d0a3f2a59e0b0a6f6b3ff0bb89fe20"
 		},
@@ -176,10 +172,6 @@
 		{
 			"ImportPath": "gopkg.in/validator.v2",
 			"Rev": "3e4f037f12a1221a0864cf0dd2e81c452ab22448"
-		},
-		{
-			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
 		}
 	]
 }

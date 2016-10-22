@@ -4,6 +4,8 @@ import (
 	"bt/db"
 	"bt/mailgun"
 	"bt/paypal"
+	"bt/trello"
+	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/segmentio/analytics-go"
@@ -106,4 +108,33 @@ func MaybeDowngradeAddress(address *db.Address) error {
 	})
 
 	return nil
+}
+
+func CommentWithNewSendingParams(cardId string) {
+	logger := log.WithField("card", cardId)
+
+	// new params, just for commenting with the updated data
+	params, err := db.GetEmailParamsForCard(cardId)
+	if err != nil {
+		logger.WithField("err", err).Warn("couldn't get sending params for the card")
+	}
+
+	// fetch this card from trello
+	card, err := trello.Client.Card(cardId)
+	if err != nil {
+		logger.WithField("err", err).Warn("couldn't find the card on trello, will not do anything")
+		return
+	}
+
+	// then post a comment
+	_, err = card.AddComment(
+		fmt.Sprintf(
+			`All comments from now on will be sent to **%s** with the subject _%s_.`,
+			params.Recipients,
+			params.LastMailSubject,
+		),
+	)
+	if err != nil {
+		logger.WithField("err", err).Warn("couldn't post comment with new card params.")
+	}
 }

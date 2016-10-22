@@ -1,10 +1,7 @@
 package helpers
 
 import (
-	"bt/db"
 	"bt/mailgun"
-
-	"gopkg.in/yaml.v2"
 
 	"errors"
 	"fmt"
@@ -84,31 +81,6 @@ func ParseMultipleAddresses(to string) ([]string, error) {
 	}
 
 	return addrs, nil
-}
-
-func ParseCardDescription(desc string) (params db.ThreadParams, err error) {
-	if desc == "" {
-		return params, errors.New("description is blank.")
-	}
-
-	parts := strings.SplitN(desc, "---\n\n", 2)
-	if len(parts) < 2 {
-		return params, errors.New("no ---\\n\\n found.")
-	}
-	parts = strings.SplitN(parts[1], "\n\n---", 2)
-	if len(parts) < 2 {
-		return params, errors.New("no \\n\\n--- found.")
-	}
-
-	err = yaml.Unmarshal([]byte(parts[0]), &params)
-	if err != nil {
-		return params, err
-	}
-	if params.Subject == "" || params.ReplyTo == "" {
-		return params, errors.New("yaml missing required params.")
-	}
-
-	return params, nil
 }
 
 func DownloadFile(path, url, authName, authPassword string) (err error) {

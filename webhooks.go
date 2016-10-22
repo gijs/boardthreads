@@ -566,6 +566,57 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 
 		goto sendMail
 	case "updateCard":
+		logger.WithField("type", wh.Action.Type).Info("webhook")
+		logger = logger.WithFields(log.Fields{"card": wh.Action.Data.Card.Id})
+		if wh.Action.Data.Card.Name != wh.Action.Data.Old.Name {
+			// updated name, maybe we wanna change the subject or update the addressee?
+			subjectold, toold, _ := helpers.ParseCardName(wh.Action.Data.Old.Name)
+			subjectnew, tonew, errnew := helpers.ParseCardName(wh.Action.Data.Card.Name)
+			if errnew != nil {
+				// changed the name to something unrelated, do nothing.
+				goto abort
+			}
+
+			// since we are changing the lastMailId, this can break threading in some cases.
+
+			if toold != tonew {
+				// update addressee -- we will do this by entering a new fake email
+				// or editing that first fake email, if this card was created by the user.
+				// this has the benefit of not adding to the list of addressees an address
+				// that could be the result of mistyping or anything like that.
+				err = db.SaveEmailReceived(
+					wh.Action.Data.Card.Id,
+					wh.Action.Data.Card.ShortLink,
+					"fake-first-mail-"+wh.Action.Data.Card.ShortLink,
+					subjectold,
+					tonew,
+					"",
+				)
+				if err != nil {
+					logger.WithField("err", err).Warn("couldn't upsert the fake-first-email for the card")
+					goto abort
+				}
+			}
+			if subjectold != subjectnew {
+				// update addressee -- we will do this by entering a new fake email
+				// updating the first fake email doesn't matter here, because the subject that
+				// counts is the subject of the last emailmessage.
+				err = db.SaveEmailReceived(
+					wh.Action.Data.Card.Id,
+					wh.Action.Data.Card.ShortLink,
+					fmt.Sprintf("fake-%d-mail", time.Now().Second())+wh.Action.Data.Card.ShortLink,
+					subjectnew,
+					"",
+					"",
+				)
+				if err != nil {
+					logger.WithField("err", err).Warn("couldn't insert the fake random email for the card")
+					goto abort
+				}
+			}
+
+			CommentWithNewSendingParams(wh.Action.Data.Card.Id)
+		}
 		goto abort
 	default:
 		w.WriteHeader(202)
@@ -801,7 +852,7 @@ func TrelloBotWebhook(w http.ResponseWriter, r *http.Request) {
 		err = db.SaveEmailReceived(
 			wh.Action.Data.Card.Id,
 			wh.Action.Data.Card.ShortLink,
-			"outgoing-"+wh.Action.Data.Card.ShortLink,
+			"fake-first-mail-"+wh.Action.Data.Card.ShortLink,
 			subject,
 			to,
 			"",
@@ -815,11 +866,7 @@ func TrelloBotWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, err = card.AddComment(
-			fmt.Sprintf(`All comments from now on will be sent to **%s** with the subject _%s_.`, to, subject))
-		if err != nil {
-			logger.WithField("err", err).Warn("couldn't comment on the card saying it was set up")
-		}
+		CommentWithNewSendingParams(wh.Action.Data.Card.Id)
 
 		// tracking
 		userId, _ := db.GetUserForAddress(addr)

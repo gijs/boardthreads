@@ -5,4 +5,5 @@ bt
 .env
 node_modules
 prod.env
+local.env
 botwebhook

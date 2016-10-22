@@ -518,7 +518,7 @@ MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
 WITH
   c, outbound, addr,
   reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
-  collect(DISTINCT LOWER(m.from)) AS recipients
+  filter(r IN collect(DISTINCT LOWER(m.from)) WHERE r <> "") AS recipients
         
 RETURN
   lastMail.id AS lastMailId,
@@ -543,6 +543,8 @@ MERGE (m:Mail {id: {1}})
     m.from = {3},
     m.commentId = {4},
     m.date = TIMESTAMP()
+  ON MATCH SET
+    m.from = {3}
 MERGE (c)-[:CONTAINS]->(m)
 
 WITH c

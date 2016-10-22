@@ -111,8 +111,10 @@ func main() {
 	router.Path("/webhooks/mailgun/email").Methods("POST").HandlerFunc(MailgunIncoming)
 	router.Path("/webhooks/mailgun/success").Methods("POST").HandlerFunc(MailgunSuccess)
 	router.Path("/webhooks/mailgun/failure").Methods("POST").HandlerFunc(MailgunFailure)
-	router.Path("/webhooks/trello/card").Methods("HEAD", "GET").HandlerFunc(TrelloCardWebhookCreation)
+	router.Path("/webhooks/trello/card").Methods("HEAD", "GET").HandlerFunc(TrelloWebhookCreation)
 	router.Path("/webhooks/trello/card").Methods("POST").HandlerFunc(TrelloCardWebhook)
+	router.Path("/webhooks/trello/bot").Methods("HEAD", "GET").HandlerFunc(TrelloWebhookCreation)
+	router.Path("/webhooks/trello/bot").Methods("POST").HandlerFunc(TrelloBotWebhook)
 	router.Path("/webhooks/trello/{card}").Methods("POST").HandlerFunc(TrelloCardWebhook)
 
 	router.Path("/check").Methods("GET").HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

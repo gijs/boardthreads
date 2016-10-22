@@ -344,6 +344,14 @@ RETURN l.id AS listId
 	return listId, nil
 }
 
+func GetMainEmailAddressForList(listId string) (addr string, err error) {
+	err = DB.Get(&addr, `
+MATCH (l:List {id: {0}})<-[:TARGETS]-(e:EmailAddress)
+RETURN e.address ORDER BY e.date LIMIT 1
+	`, listId)
+	return
+}
+
 func GetCardForMessage(messageId, rawSubject, senderAddress, recipientAddress string) (string, error) {
 	var queryResult struct {
 		ShortLink   string         `db:"cardShortLink"`
@@ -508,20 +516,20 @@ MATCH (outbound:EmailAddress)<-[:SENDS_THROUGH]-(addr)
 MATCH (c)-[:CONTAINS]->(m:Mail) WHERE m.subject IS NOT NULL
 
 WITH
- c, outbound, addr,
- reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
- collect(DISTINCT LOWER(m.from)) AS recipients
+  c, outbound, addr,
+  reduce(lastMail = {}, m IN collect(m) | CASE WHEN lastMail.date > m.date THEN lastMail ELSE m END) AS lastMail,
+  collect(DISTINCT LOWER(m.from)) AS recipients
         
 RETURN
- lastMail.id AS lastMailId,
- lastMail.subject AS lastMailSubject,
- LOWER(addr.address) AS inbound,
- LOWER(outbound.address) AS outbound,
- CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
- CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
- CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier,
- CASE WHEN addr.signatureTemplate IS NOT NULL THEN addr.signatureTemplate ELSE "" END AS signatureTemplate,
- recipients
+  lastMail.id AS lastMailId,
+  lastMail.subject AS lastMailSubject,
+  LOWER(addr.address) AS inbound,
+  LOWER(outbound.address) AS outbound,
+  CASE WHEN addr.replyTo IS NOT NULL THEN addr.replyTo ELSE addr.address END AS replyTo,
+  CASE WHEN addr.senderName IS NOT NULL THEN addr.senderName ELSE "" END AS senderName,
+  CASE WHEN addr.addReplier IS NOT NULL THEN addr.addReplier ELSE false END AS addReplier,
+  CASE WHEN addr.signatureTemplate IS NOT NULL THEN addr.signatureTemplate ELSE "" END AS signatureTemplate,
+  recipients
 LIMIT 1`, shortLink)
 	return
 }

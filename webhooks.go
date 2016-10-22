@@ -488,7 +488,7 @@ func MailgunIncoming(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func TrelloCardWebhookCreation(w http.ResponseWriter, r *http.Request) {
+func TrelloWebhookCreation(w http.ResponseWriter, r *http.Request) {
 	log.Debug("a Trello webhook was created.")
 	w.WriteHeader(200)
 }
@@ -566,26 +566,6 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 
 		goto sendMail
 	case "updateCard":
-		logger.WithFields(log.Fields{"type": wh.Action.Type, "card": wh.Action.Data.Card.ShortLink}).Info("webhook")
-		params, err := helpers.ParseCardDescription(wh.Action.Data.Card.Desc)
-		if err != nil {
-			logger.WithFields(log.Fields{
-				"err":  err,
-				"card": wh.Action.Data.Card.ShortLink,
-				"desc": wh.Action.Data.Card.Desc,
-			}).Info("desc change will not take effect.")
-			goto abort
-		}
-
-		logger.WithFields(log.Fields{
-			"params": params,
-			"card":   wh.Action.Data.Card.ShortLink,
-		}).Info("changing first email params.")
-		err = db.ChangeThreadParams(wh.Action.Data.Card.Id, params)
-		if err != nil {
-			log.WithField("err", err).Error("couldn't change thread params.")
-		}
-
 		goto abort
 	default:
 		w.WriteHeader(202)
@@ -726,4 +706,134 @@ sendMail:
 			"address": params.InboundAddr,
 		},
 	})
+}
+
+func TrelloBotWebhook(w http.ResponseWriter, r *http.Request) {
+	/*
+	   a the bot is added to a card
+	   if the card is not in the database, then it means we are creating an outbound email thread
+	   create it (by inserting a fake received email)
+	   post a comment on the card telling about what we're doing
+	*/
+	logger := log.WithFields(log.Fields{"req-id": context.Get(r, "request-id")})
+
+	var wh struct {
+		Action goTrello.Action `json:"action"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&wh)
+	if err != nil {
+		sendJSONError(w, err, 400, logger)
+		return
+	}
+
+	// filter out bot actions (the bot adding itself to cards, for example)
+	if wh.Action.MemberCreator.Id == settings.TrelloBotId {
+		w.WriteHeader(202)
+		return
+	}
+
+	switch wh.Action.Type {
+	case "addMemberToCard":
+		logger = logger.WithFields(log.Fields{
+			"card": wh.Action.Data.Card.Name,
+			"sl":   wh.Action.Data.Card.ShortLink,
+		})
+		w.WriteHeader(202)
+
+		// parse the card name
+		subject, to, err := helpers.ParseCardName(wh.Action.Data.Card.Name)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"err": err,
+			}).Warn("failed to parse card name.")
+
+			err = trello.RemoveBotFromCard(wh.Action.Data.Card.Id)
+			if err != nil {
+				logger.WithField("err", err).Warn("couldn't remove bot from card.")
+			}
+			return
+		}
+
+		// fetch the @boardthreads.com address associated with the list
+		card, _ := trello.Client.Card(wh.Action.Data.Card.Id)
+		addr, err := db.GetMainEmailAddressForList(card.IdList)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"err":    err,
+				"idList": card.IdList,
+			}).Warn("couldn't find a boardthreads address associated with the list")
+			err = trello.RemoveBotFromCard(wh.Action.Data.Card.Id)
+			if err != nil {
+				logger.WithField("err", err).Warn("couldn't remove bot from card.")
+			}
+			return
+		}
+
+		// create a webhook for the card
+		webhookId, err := trello.CreateWebhook(
+			wh.Action.Data.Card.Id, settings.WebhookHandler+"/webhooks/trello/card")
+		if err != nil {
+			logger.WithField("err", err).Warn("couldn't set webhook for card.")
+			err = trello.RemoveBotFromCard(wh.Action.Data.Card.Id)
+			if err != nil {
+				logger.WithField("err", err).Warn("couldn't remove bot from card.")
+			}
+			return
+		}
+
+		// create the card in the database
+		err = db.SaveCardWithEmail(
+			addr,
+			wh.Action.Data.Card.ShortLink,
+			wh.Action.Data.Card.Id,
+			webhookId,
+		)
+		if err != nil {
+			logger.WithField("err", err).Warn("couldn't save card with email.")
+			err = trello.RemoveBotFromCard(wh.Action.Data.Card.Id)
+			if err != nil {
+				logger.WithField("err", err).Warn("couldn't remove bot from card.")
+			}
+			return
+		}
+
+		// insert the fake email
+		err = db.SaveEmailReceived(
+			wh.Action.Data.Card.Id,
+			wh.Action.Data.Card.ShortLink,
+			"outgoing-"+wh.Action.Data.Card.ShortLink,
+			subject,
+			to,
+			"",
+		)
+		if err != nil {
+			logger.WithField("err", err).Warn("couldn't insert the fake email for the card")
+			err = trello.RemoveBotFromCard(wh.Action.Data.Card.Id)
+			if err != nil {
+				logger.WithField("err", err).Warn("couldn't remove bot from card.")
+			}
+			return
+		}
+
+		_, err = card.AddComment(
+			fmt.Sprintf(`All comments from now on will be sent to **%s** with the subject _%s_.`, to, subject))
+		if err != nil {
+			logger.WithField("err", err).Warn("couldn't comment on the card saying it was set up")
+		}
+
+		// tracking
+		userId, _ := db.GetUserForAddress(addr)
+		segment.Track(&analytics.Track{
+			Event:  "Created outbound email thread",
+			UserId: userId,
+			Properties: map[string]interface{}{
+				"card":    wh.Action.Data.Card.Id,
+				"to":      to,
+				"address": addr,
+			},
+		})
+
+	default:
+		return
+	}
 }

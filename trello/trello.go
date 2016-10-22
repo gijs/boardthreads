@@ -81,6 +81,15 @@ func EnsureBot(token, listId string) (*trello.Board, error) {
 	return board, nil
 }
 
+func RemoveBotFromCard(cardId string) error {
+	card, err := Client.Card(cardId)
+	if err != nil {
+		return err
+	}
+
+	return card.RemoveMemberId(settings.BotId)
+}
+
 func CreateCardFromMessage(listId string, message mailgun.StoredMessage) (card *trello.Card, err error) {
 	list, err := Client.List(listId)
 	if err != nil {

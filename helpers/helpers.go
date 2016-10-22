@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -168,7 +169,30 @@ func CommentEnvelopePrefix(text string) (len int) {
 }
 
 func MakeCardName(message mailgunGo.StoredMessage) string {
-	return fmt.Sprintf("%s :: %s", ReplyToOrFrom(message), mailgun.TrimSubject(message.Subject))
+	return fmt.Sprintf("%s {%s}", mailgun.TrimSubject(message.Subject), ReplyToOrFrom(message))
+}
+
+func ParseCardName(name string) (subject string, addr string, err error) {
+	splitted := strings.Split(name, "{")
+	if len(splitted) != 2 {
+		err = errors.New("{ should have splitted in 2.")
+		return
+	}
+	splitted2 := strings.Split(splitted[1], "}")
+	if len(splitted2) != 2 {
+		err = errors.New("} should have splitted in 2.")
+		return
+	}
+
+	address, err := mail.ParseAddress(splitted2[0])
+	if err != nil {
+		return
+	}
+
+	subject = strings.TrimSpace(splitted[0])
+	addr = address.Address
+
+	return
 }
 
 func MakeCardDesc(message mailgunGo.StoredMessage) string {

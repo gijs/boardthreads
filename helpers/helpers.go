@@ -4,6 +4,8 @@ import (
 	"bt/db"
 	"bt/mailgun"
 
+	"gopkg.in/yaml.v2"
+
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 
 	log "github.com/Sirupsen/logrus"
 	mailgunGo "github.com/websitesfortrello/mailgun-go"
@@ -56,38 +56,34 @@ func HTMLToMarkdown(html string) string {
 }
 
 func ParseAddress(from string) string {
-	command := exec.Command(filepath.Join(here, "parseaddress"), from)
-
-	output, err := command.CombinedOutput()
+	from = strings.Split(from, ",")[0]
+	address, err := mail.ParseAddress(from)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"err":     err.Error(),
+			"err":     err,
 			"address": from,
-			"stderr":  string(output),
 		}).Warn("couldn't parse address")
 		return from
 	}
-
-	return string(output)
+	return string(address.Address)
 }
 
 func ParseMultipleAddresses(to string) ([]string, error) {
-	command := exec.Command(filepath.Join(here, "parsemultipleaddresses"), to)
-
-	output, err := command.CombinedOutput()
+	addresses, err := mail.ParseAddressList(to)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"err":       err.Error(),
+			"err":       err,
 			"addresses": to,
-			"stderr":    string(output),
-		}).Warn("couldn't parse")
+		}).Warn("couldn't parse multiple addresses")
 		return nil, err
 	}
 
-	// the JS script will print the result as a list of comma-separated addresses
-	addresses := strings.Split(string(output), ",")
+	addrs := make([]string, len(addresses))
+	for i, a := range addresses {
+		addrs[i] = a.Address
+	}
 
-	return addresses, nil
+	return addrs, nil
 }
 
 func ParseCardDescription(desc string) (params db.ThreadParams, err error) {

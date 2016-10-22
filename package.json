@@ -9,7 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "addressparser": "^1.0.1",
     "he": "^0.5.0",
     "mime": "^1.3.4",
     "paypal-recurring2": "github:uncedric/paypal-recurring2",

@@ -568,13 +568,16 @@ func TrelloCardWebhook(w http.ResponseWriter, r *http.Request) {
 	case "updateCard":
 		logger.WithField("type", wh.Action.Type).Info("webhook")
 		logger = logger.WithFields(log.Fields{"card": wh.Action.Data.Card.Id})
-		if wh.Action.Data.Card.Name != wh.Action.Data.Old.Name {
+		if wh.Action.Data.Old.Name != "" {
 			// updated name, maybe we wanna change the subject or update the addressee?
 			subjectold, toold, _ := helpers.ParseCardName(wh.Action.Data.Old.Name)
 			subjectnew, tonew, errnew := helpers.ParseCardName(wh.Action.Data.Card.Name)
 			if errnew != nil {
 				// changed the name to something unrelated, do nothing.
-				logger.WithField("err", err).Debug("error parsing new name")
+				logger.WithFields(log.Fields{
+					"err":  errnew,
+					"name": wh.Action.Data.Card.Name,
+				}).Debug("error parsing new name")
 				goto abort
 			}
 			logger.WithFields(log.Fields{

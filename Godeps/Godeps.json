@@ -1,7 +1,7 @@
 {
 	"ImportPath": "bt",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v62",
+	"GodepVersion": "v75",
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
@@ -127,8 +127,7 @@
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/go-trello",
-			"Comment": "v0.1-41-gb7add6a",
-			"Rev": "b7add6ad4c221be111885a2bb6635bc499ff896d"
+			"Rev": "4162562a3fb9d0b8ad58731b31d91e426d9b04b6"
 		},
 		{
 			"ImportPath": "github.com/websitesfortrello/mailgun-go",

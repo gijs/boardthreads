@@ -63,13 +63,14 @@ type Action struct {
 			Text string `json:"text"`
 		} `json:"action"`
 		Old struct {
-			Text   string  `json:"text"`
-			Name   string  `json:"name"`
-			Desc   string  `json:"desc"`
-			Closed bool    `json:"closed"`
-			Color  string  `json:"color"`
-			Pos    float64 `json:"pos"`
-			IdList string  `json:"idList"`
+			Text              string  `json:"text"`
+			Name              string  `json:"name"`
+			Desc              string  `json:"desc"`
+			Closed            bool    `json:"closed"`
+			Color             string  `json:"color"`
+			Pos               float64 `json:"pos"`
+			IdList            string  `json:"idList"`
+			IdAttachmentCover string  `json:"idAttachmentCover"`
 		} `json:"old"`
 		Text string `json:"text"`
 	} `json:"data"`

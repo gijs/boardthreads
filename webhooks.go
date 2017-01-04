@@ -46,9 +46,12 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	commenterId := strings.Trim(r.PostFormValue("commenter"), `"`)
+
 	logger.WithFields(log.Fields{
 		"card":       cardId,
 		"addReplier": params.AddReplier,
+		"commenter":  commenterId,
 	}).Info("mailgun success")
 
 	if params.AddReplier {
@@ -60,8 +63,6 @@ func MailgunSuccess(w http.ResponseWriter, r *http.Request) {
 			}).Warn("couldn't fetch card after mail success")
 			return
 		}
-
-		commenterId := strings.Trim(r.PostFormValue("commenter"), `"`)
 
 		card.AddMemberId(commenterId)
 		if err != nil {

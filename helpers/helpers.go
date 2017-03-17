@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"bt/mailgun"
+	"regexp"
 
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	mailgunGo "github.com/websitesfortrello/mailgun-go"
 )
 
+var emailRegex = regexp.MustCompile(`\b[._\w-]+@\w+[.\w]+\w+\b`)
 var here string
 
 func init() {
@@ -56,11 +58,14 @@ func ParseAddress(from string) string {
 	from = strings.Split(from, ",")[0]
 	address, err := mail.ParseAddress(from)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err":     err,
-			"address": from,
-		}).Warn("couldn't parse address")
-		return from
+		match := emailRegex.FindString("")
+		if match == "" {
+			log.WithFields(log.Fields{
+				"err":     err,
+				"address": from,
+			}).Warn("couldn't parse address")
+			return from
+		}
 	}
 	return string(address.Address)
 }

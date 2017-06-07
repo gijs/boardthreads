@@ -1,0 +1,126 @@
+<!doctype html>
+
+<meta charset=utf-8>
+<title>BoardThreads - the helpdesk software that works inside Trello</title>
+<meta name=viewport content="width=device-width, initial-scale=1">
+<meta property="og:image" content="//boardthreads.com/favicon.ico">
+<link href=//dashboard.boardthreads.com/style.css rel=stylesheet>
+<link href=/public/style.css rel=stylesheet>
+<script>
+(function (d, s, c) {
+  var x, h, n = Date.now()
+  tc = function (p) {
+    m = s.getItem('_tcx') > n ? s.getItem('_tch') : 'perereca-cacareco'
+    x = new XMLHttpRequest()
+    x.addEventListener('load', function () {
+      if (x.status == 200) {
+        s.setItem('_tch', x.responseText)
+        s.setItem('_tcx', n + 14400000)
+      }
+    })
+    x.open('GET', 'https://visitantes.alhur.es/'+m+'.xml?r='+d.referrer+'&c='+c+(p?'&p='+p:''))
+    x.send()
+  }
+  tc()
+})(document, localStorage, 'r5f7p8')
+</script>
+
+<body>
+  <header>
+    <a href="">
+      <img src="public/logo.svg">
+      <h1><span>board</span>threads</h1>
+    </a>
+    <p>helpdesk software that works inside <a href="https://trello.com/"><img src="https://d2k1ftgv7pobq7.cloudfront.net/meta/p/res/images/c13d1cd96a2cff30f0460a5e1860c5ea/header-logo-blue.svg" alt="Trello" title="Trello"></a></p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href=#howitworks>How it works</a></li>
+      <li><a href=#screenshots>Screenshots</a></li>
+      <li><a href=#getting>Sign up or sign in</a></li>
+      <li><a href=#contact>Contact</a></li>
+      <li><a href=http://dashboard.boardthreads.com/>Login or sign up</a></li>
+    </ul>
+  </nav>
+  <main>
+    <article>
+      <video poster="public/basic.gif" autostart autoplay preload loop>
+        <source src=public/basic.webm type=video/webm>
+        <source src=public/basic.ogv type=video/ogg>
+        <source src=public/basic.mp4 type=video/mp4>
+      </video>
+    </article>
+    <article>
+      <header>
+        <h1 id=howitworks>How it works</h1>
+      </header>
+      <p>Emails received on a certain address are immediately sent to Trello. Threaded emails are kept within the same Trello card. Comments prefixed with the <code style="display: inline; padding: 5px">:email:</code> emoji, <img src="https://d78fikflryjgj.cloudfront.net/images/emoji/1fabc149ec15ded868eb7d32d9d10daa/envelope.png" style="height: 1em">, will be sent back to the submitter, as replies. Markdown is supported.</p>
+      <p>Comments without the prefix are not sent back, so you can discuss the issues internally.</p>
+    </article>
+    <article>
+      <header>
+        <h1 id=tryitnow>Try it now</h1>
+      </header>
+      <p>You can get a quick glance of BoardThreads simplicity using just a few clicks and right now: <mark>send an email to <a target="_blank" href="mailto:test@boardthreads.com?subject=Can+I+have+a+problem+with+your+service,+please?&body=I+really+want+to!">test@boardthreads.com</a></mark>, then breath deeply and watch as it appear in <a href="https://trello.com/b/lHuiOcVX/boardthreads-demo">this board</a>, after that you can <mark>reply in the card with a comment</mark> (prefixed by the <code style="display: inline; padding: 5px">:email:</code> emoji, <img src="https://d78fikflryjgj.cloudfront.net/images/emoji/1fabc149ec15ded868eb7d32d9d10daa/envelope.png" style="height: 1em">) and you'll get the response in your email. Done.</li>
+    </article>
+    <article>
+      <header>
+        <h1 id=getting>Getting BoardThreads</h1>
+      </header>
+      <p>It costs <i>$18 / month</i> for unlimited users, unlimited emails.</p>
+      <p>Sign up here and get an <code>@boardthreads.com</code> address linked to a Trello list.</p>
+      <form action=https://dashboard.boardthreads.com/>
+        <button>Start now</button>
+      </form>
+      <p>The first 2 months are free.</p>
+    </article>
+    <article id=screenshots>
+      <header>
+        <h1>Trello makes an ideal helpdesk environment</h1>
+      </header>
+      <img class=big src=public/trelloboard.png title='Simplicity, clarity and teamwork.' alt=screenshot>
+      <p>Make your team work together on answering customers and creating the product.</p>
+    </article>
+    <article>
+      <header>
+        <h1>Fairly customizable</h1>
+      </header>
+      <img class=big src=public/preferences.png title='You can configure many different settings.' alt=screenshot>
+      <p>Send or receive email through your custom email address. Add repliers to the card. Signature templates!</p>
+    </article>
+    <article>
+      <header>
+        <h1>Integrations available</h1>
+      </header>
+      <p>Since Trello is a well established product, there are a lot of extensions and apps that complete your Trello experience, from integrations with third-party services like Slack and GitHub to tools that make it easy to do time-tracking and generate useful reports. All these you can find at <a href="https://trello.com/integrations">this official Trello page dedicated to integrations</a>.</p>
+    </article>
+    <article>
+      <header>
+        <h1>The first 2 months are free</h1>
+      </header>
+      <p>After that it costs only <i>$18 / month</i> for unlimited users, unlimited emails.</p>
+      <p>Sign up here and get an <code>@boardthreads.com</code> address linked to a Trello list.</p>
+      <form action=https://dashboard.boardthreads.com/>
+        <button>Get a free account</button>
+      </form>
+    </article>
+  </main>
+  <aside>
+    <h1 id=contact>Contact</h1>
+    <div>If you have questions, complaints or comments to us, please contact us at <script>document.write('<a href="mailto:hel' + 'p@boardthreads.com">help@bo' + 'ardthreads.com</a>')</script> or use the form.</div>
+    <div>
+      <form method="post" action="https://formspree.io/pxvbzklx">
+        <input type="hidden" name="_subject" value="Contact form">
+        <input type="email" name="_replyto" placeholder="Your email" required>
+        <textarea name="text" placeholder="Your message" required></textarea>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+  </aside>
+
+  <footer>
+    <p>© 2016 <a href="https://websitesfortrello.com/">Websites for Trello</a>.
+    <p>Nothing uncommon in our <a href="terms.txt">Terms of service and privacy policy</a>.</p>
+    <p><a href="https://thenounproject.com/search?q=whiteboard&i=89863">whiteboard icon</a> designed by <a href="https://thenounproject.com/smogdog/">Hans Gerhard Meier</a> from the Noun Project</p>
+  </footer>
+</body>

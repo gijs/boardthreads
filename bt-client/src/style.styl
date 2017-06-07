@@ -1,0 +1,637 @@
+/* miscellaneous */
+*
+  box-sizing border-box
+  
+$darkgrey = #3B413C
+$strongorange = #D1634D
+$lightbackground = #F2F7DF
+$trelloblue = #0079BF
+$trellogrey = #4E4E4E
+
+a
+  text-decoration none
+  &:hover
+    text-decoration underline
+
+b
+  color $darkgrey
+  &:hover
+    text-decoration underline
+
+small
+  padding 0 10px
+
+body
+  & > header
+    text-align center
+  & > aside
+    padding 10px
+    img
+      width 120px
+  & > nav
+    ul
+      list-style none
+
+  & > footer
+    text-align center
+
+main
+  padding 10px
+  article
+    p
+      text-align justify
+  & > article
+    iframe
+      width 90%
+      margin auto
+    img
+      display block
+      margin auto
+  img
+    max-width 100%
+    
+  & > section
+    & > ul
+      list-style none
+      overflow auto
+
+      li, header
+        overflow hidden
+
+    & > article
+      margin 10px 0
+      clear both
+      border-top 1px solid
+      header
+        display block
+        height 70px
+        margin 20px 0
+        img
+          height 100%
+          float left
+          margin 0 10px 0 0
+        h1
+          margin 0
+          float left
+        & + *
+          clear both
+      footer
+        text-align right
+  nav
+    text-align center
+    ul
+      display inline
+      list-style none
+    li
+      a
+        display none
+      a[href]
+        display inline
+
+header
+  aside
+    ul
+      list-style none
+      padding 0
+      display inline
+    li
+      display inline
+      a
+        min-height 1em
+        margin 0.1em
+        padding 0.2em
+        border dotted 1px
+        &:hover
+          text-decoration none
+          opacity 0.7
+          background-color #eee
+
+main > section > article header aside,
+main > section > article header time,
+main > section > article header p
+  width 70%
+  display block
+  margin 0
+  float left
+
+/* layout */
+body
+  max-width 1500px
+  margin auto
+  & > main
+    width 60%
+    margin-left 20%
+  & > nav
+    & + main
+      margin-left 0
+  & > footer
+    text-align center
+
+body > nav,
+body > main,
+body > footer
+  float left
+
+body > aside
+  clear both
+  width 40%
+  margin auto
+  text-align center
+
+body > header,
+body > footer
+  width 100%
+  
+body > main
+  width 80%
+  min-height 400px
+
+body > nav
+  width 20%
+  
+/* forms */
+input, select, textarea
+  padding 0.5em 0.6em
+  display inline-block
+  border 1px solid #ccc
+  box-shadow inset 0 1px 3px #ddd
+  border-radius 4px
+  vertical-align middle
+  -webkit-box-sizing border-box
+  -moz-box-sizing border-box
+  box-sizing border-box
+
+input[type="color"]
+  padding 0.2em 0.5em
+
+input:focus, select:focus, textarea:focus
+  outline 0
+  border-color #129FEA
+
+input[type="file"]:focus,
+input[type="radio"]:focus,
+input[type="checkbox"]:focus
+  outline thin solid #129FEA
+  outline 1px auto #129FEA
+
+input[type="color"][disabled],
+select[disabled],
+textarea[disabled]
+  cursor not-allowed
+  background-color #eaeded
+  color #cad2d3
+
+input[readonly],
+select[readonly],
+textarea[readonly]
+  background-color #eee
+  color #777
+  border-color #ccc
+
+input:focus:invalid,
+textarea:focus:invalid,
+select:focus:invalid
+  color #b94a48
+  border-color #e9322d
+
+input[type="file"]:focus:invalid:focus,
+input[type="radio"]:focus:invalid:focus,
+input[type="checkbox"]:focus:invalid:focus
+  outline-color #e9322d
+
+select
+  height 2.25em
+  border 1px solid #ccc
+  background-color white
+
+select[multiple]
+  height auto
+
+label
+  margin 0.5em 0 0.2em
+
+fieldset
+  margin 0
+  padding 0.35em 0 0.75em
+  border 0
+
+legend
+  display block
+  width 100%
+  padding 0.3em 0
+  margin-bottom 0.3em
+  color #333
+  border-bottom 1px solid #e5e5e5
+  
+button
+  display inline-block
+  zoom 1
+  line-height normal
+  white-space nowrap
+  vertical-align middle
+  text-align center
+  cursor pointer
+  -webkit-user-drag none
+  -webkit-user-select none
+  -moz-user-select none
+  -ms-user-select none
+  user-select none
+  -webkit-box-sizing border-box
+  -moz-box-sizing border-box
+  box-sizing border-box
+  font-family inherit
+  font-size 100%
+  padding 0.5em 1em
+  color #444
+  color rgba(0, 0, 0, 0.80)
+  border 1px solid #999
+  border none rgba(0, 0, 0, 0)
+  background-color #E6E6E6
+  text-decoration none
+  border-radius 4px
+  &::-moz-focus-inner
+    padding 0
+    border 0
+    padding 0
+    border 0
+  &:focus
+    outline 0
+  &:active
+    box-shadow 0 0 0 1px rgba(0,0,0, 0.15) inset, 0 0 6px rgba(0,0,0, 0.20) inset
+    border-color #000\9
+
+button:hover,
+button:focus
+  background-image -webkit-gradient(linear, 0 0, 0 100%, from(transparent), color-stop(40%, rgba(0,0,0, 0.05)), to(rgba(0,0,0, 0.10)))
+  background-image -webkit-linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10))
+  background-image -moz-linear-gradient(top, rgba(0,0,0, 0.05) 0%, rgba(0,0,0, 0.10))
+  background-image -o-linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10))
+  background-image linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10))
+
+button[disabled]
+  border none
+  background-image none
+  opacity 0.40
+  cursor not-allowed
+  box-shadow none
+  
+/* fonts */
+@font-face {
+  font-family: 'Megrim';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Megrim'), url(https://fonts.gstatic.com/s/megrim/v7/3QlnWQVA-dQyEeamqiHm2g.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215, U+E0FF, U+EFFD, U+F000;
+}
+@font-face {
+  font-family: 'Merriweather Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Merriweather Sans'), local('MerriweatherSans-Regular'), url(https://fonts.gstatic.com/s/merriweathersans/v7/AKu1CjQ4qnV8MUltkAX3sD48MEBspdEKklcQvcIk8pU.woff2) format('woff2');
+  unicode-range: U+0100-024F, U+1E00-1EFF, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Merriweather Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Merriweather Sans'), local('MerriweatherSans-Regular'), url(https://fonts.gstatic.com/s/merriweathersans/v7/AKu1CjQ4qnV8MUltkAX3sMZ4HySTEWshgORbPp2tk8k.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215, U+E0FF, U+EFFD, U+F000;
+}
+
+/* theme-specific things */
+html
+  background $lightbackground
+  font-family 'Merriweather Sans'
+
+body > header
+  font-family Megrim, Verdana, Tahoma, Arial, sans-serif
+  text-align center
+  margin-top 10px
+  
+  img
+    height 20px
+  
+  h1
+    display inline
+    font-size 20px
+
+body > nav
+  li
+    margin 0
+    padding 0
+  
+  a
+    display block
+    margin 0
+    padding 14px 4px
+    
+  a[href]
+    transition linear all 450ms
+    color $strongorange
+    border-radius 0 20px 20px 0
+    
+    .selected,
+    &:hover
+      color darken($strongorange, 40)
+      background-color lighten($strongorange, 25)
+      transition linear all 150ms
+      text-decoration none
+      border-radius 0 20px 20px 0
+      
+body > main
+  padding 15px 30px
+  font-size 0.9em
+
+  header
+    width auto
+    height auto
+    overflow auto
+    min-height 26px
+  
+  & > section
+    ul
+      padding 0
+      
+      header h1 a:first-of-type
+        color $strongorange
+        min-width 320px
+        display block
+        float left
+        text-align right
+        padding-right 5px
+
+        &:hover
+          text-decoration none
+      
+      .list
+        color $trellogrey
+        
+      a:last-of-type
+        color $trelloblue
+        
+      article
+        clear both
+        margin 10px 0
+
+        & > header
+          & > h1
+            float left
+            margin 0
+
+          & > aside
+            line-height 1.7em
+            margin -0.1em 1em
+            
+            float left
+            
+            li a
+              padding 5px
+              background-color rgba(255,255,255,0.2)
+              border none
+              cursor pointer
+            
+        & > *:not(header):not(footer)
+          clear both
+          overflow hidden
+        
+ body > aside
+  form
+    label
+      text-align left
+    label, button
+      margin-top 17px
+    label, input, textarea
+      display block
+      width 100%
+    textarea
+      width 100%
+      min-height 70px
+  
+button
+  background-color $darkgrey
+  color white
+        
+/* boardthreads.com specific */
+.hint--top:focus:after, .hint--top:focus:before, .hint--top:hover:after, .hint--top:hover:before
+.hint--bottom:focus:after, .hint--bottom:focus:before, .hint--bottom:hover:after, .hint--bottom:hover:before
+  text-align justify
+  white-space pre-wrap
+  width 300px
+  font-size 105%
+  line-height 105%
+
+.hint--right:focus:after, .hint--right:focus:before, .hint--right:hover:after, .hint--right:hover:before
+.hint--left:focus:after, .hint--left:focus:before, .hint--left:hover:after, .hint--left:hover:before
+  text-align justify
+
+button#login
+  display block
+  width 30%
+  position absolute
+  top 130px
+  left 35%
+  height 100px
+
+li > article.DISABLED
+  opacity 0.4
+  header h1
+    text-decoration line-through
+
+li > article.VALID
+  header h1 a:first-of-type
+    color $darkgrey
+
+    &:hover
+      color darken($darkgrey, 20)
+
+li > article.TRIAL
+  header h1
+    color $strongorange
+
+    &:hover
+      color darken($strongorange, 20)
+
+li > article.opened
+  padding 18px
+  background-color darken($lightbackground, 12)
+  border-radius 7px
+    
+  button.delete
+    background-color $strongorange
+    color white
+  
+  header > aside
+    li
+      display inline
+
+      a.delete
+        color $strongorange
+  
+  & > div,
+  & > *:not(header):not(footer)
+    text-align left
+    
+form.addnew
+  width 700px
+  max-width 100%
+  margin-bottom 43px
+  
+  .group,
+  select,
+  button
+    display block
+    clear both
+    float none
+    margin 6px auto
+    
+  input,
+  select,
+  button
+    height 36px
+  
+  .group
+    width 80%
+    text-align center
+    
+    input
+      display inline-block
+    
+    input:not([disabled])
+      border-right 0
+      border-radius 4px 0 0 4px
+      width 180px
+      text-align right
+    input[disabled]
+      border-left 0
+      border-radius 0 4px 4px 0
+      width 140px
+      
+  select
+    -webkit-appearance button
+    -moz-appearance button
+    appearance button
+
+  select:first-of-type
+    width 50%
+    float left
+    margin-left 10%
+  
+  select:nth-of-type(2)
+    width 50%
+    float right
+    margin-right 10%
+    
+  button
+    font-size 120%
+    margin-top 100px
+    width 30%
+
+.outboundaddr
+  float left
+
+  input:not([type="checkbox"])
+    width 250px
+    max-width 100%
+
+label.show-mx
+  display block
+  float left
+  padding 40px
+
+  & + *
+    clear both
+
+.dns
+  div
+    width 100%
+
+  div > span
+    display table-cell
+    vertical-align middle
+    padding 12px 18px
+    background-color rgba(255, 255, 255, 0.55)
+    background-clip padding-box
+    border 5px solid transparent
+    font-family monospace
+    word-break break-all
+    height auto
+
+    &:nth-child(1)
+      width 7%
+      text-align center
+    &:nth-child(2)
+      width 24%
+    &:nth-child(3)
+      width 70%
+    &:nth-child(3):nth-last-child(3)
+      width 60%
+    &:nth-child(4),
+    &:nth-child(5)
+      width 8%
+      text-align center
+    &:nth-child(4):nth-last-child(2)
+      width 18%
+
+.check-dns
+  margin-top 20px
+
+  button
+    margin auto
+    display block
+
+form.settings
+  width 100%
+  display block
+  clear both
+  position relative
+  top 20px
+  margin-bottom 20px
+
+  & > label
+    padding 10px
+    float left
+    width 50%
+    display block
+
+    &.addReplier,
+    &.moveToTop,
+    &.messageInDesc
+      width 33%
+
+    &.signatureTemplate
+      width 60%
+      float none
+      margin auto
+      clear both
+
+      textarea
+        width 100%
+        height 150px
+
+    input
+      margin-left 10px
+
+    &:first-child
+      clear both
+    &:last-child
+      clear right
+
+  .senderName
+  .replyTo
+    input
+      min-width 250px
+
+  & > button
+    clear both
+    display block
+    max-width 100%
+    width 200px
+    margin auto
+
+.activity-log
+  header h1,
+  header h1 a
+    text-align left !important
+
+  article p
+    text-align left

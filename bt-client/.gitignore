@@ -1,0 +1,7 @@
+node_modules
+browserify-cache.json
+dist
+lib
+*.swo
+*.swp
+npm-debug.log

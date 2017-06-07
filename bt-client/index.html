@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name=description content="">
+  <link rel=stylesheet href=style.css>
+  <link rel="shortcut icon" type=image/icon href=favicon.ico>
+  <title>BoardThreads</title>
+  <script>
+(function (d, s, c) {
+  var x, h, n = Date.now()
+  tc = function (p) {
+    m = s.getItem('_tcx') > n ? s.getItem('_tch') : 'perereca-cacareco'
+    x = new XMLHttpRequest()
+    x.addEventListener('load', function () {
+      if (x.status == 200) {
+        s.setItem('_tch', x.responseText)
+        s.setItem('_tcx', n + 14400000)
+      }
+    })
+    x.open('GET', 'https://visitantes.alhur.es/'+m+'.xml?r='+d.referrer+'&c='+c+(p?'&p='+p:''))
+    x.send()
+  }
+  tc()
+})(document, localStorage, 'r5f7p8')
+window.tc && tc(1)
+  </script>
+  <link rel=stylesheet href=https://cdnjs.cloudflare.com/ajax/libs/humane-js/3.2.2/themes/flatty.min.css>
+  <link rel=stylesheet href=https://cdnjs.cloudflare.com/ajax/libs/typicons/2.0.7/typicons.min.css>
+  <link rel=stylesheet href=https://cdnjs.cloudflare.com/ajax/libs/hint.css/2.2.0/hint.min.css>
+</head>
+<body>
+  <header>
+    <img src=logo.svg>
+    <h1>BoardThreads</h1>
+  </header>
+  <nav></nav>
+  <main></main>
+  <aside>
+    <h1>Help</h1>
+    <div>If you have questions, complaints or comments, please contact us at using the form and we will be pleased to help!</div>
+    <div>
+      <form method=post action=https://formspree.io/help@boardthreads.com>
+        <label>EMAIL<input type="email" name=_replyto placeholder="Your email" required=""></label>
+        <label>MESSAGE<textarea name=text placeholder="Your message" required></textarea></label>
+        <button>Submit</button>
+      </form>
+    </div>
+  </aside>
+  <footer>
+    <p>© 2016 <a href="https://websitesfortrello.com/">Websites for Trello</a>.</p>
+    <p>Nothing uncommon in our <a href="terms.html">Terms of service and privacy policy</a>.</p>
+    <p><a href="https://thenounproject.com/search?q=whiteboard&amp;i=89863">whiteboard icon</a> designed by <a href="https://thenounproject.com/smogdog/">Hans Gerhard Meier</a> from the Noun Project</p>
+  </footer>
+  <script src=main.js></script>
+</body>
+</html>
